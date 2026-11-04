@@ -32,8 +32,14 @@ export class CameraRig {
     el.addEventListener('wheel', this.wheel, { passive: false });
   }
 
+  get distance(): number {
+    return this.camera.position.distanceTo(new THREE.Vector3(this.target.x, 0, this.target.y));
+  }
+
   resize(w: number, h: number): void {
     this.camera.aspect = w / h;
+    // Portrait phones get a wider lens so the camera can sit closer (more depth, less haze).
+    this.camera.fov = this.camera.aspect < 1 ? 44 : 34;
     this.camera.updateProjectionMatrix();
     // Wider screens can show more of the island at once.
     this.maxWidth = this.camera.aspect > 1 ? 52 : 40;

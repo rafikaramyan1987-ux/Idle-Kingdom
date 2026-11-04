@@ -7,7 +7,7 @@ import { composeBuilding, constructionVisual, mergeStatic, tierOf, type Building
 import { Birds, RegionClouds, Smoke, Villagers, createOcean, fogTexture } from './effects';
 import { hash2, hexDist } from '../game/map';
 
-const LOCKED_COLOR = new THREE.Color(0.8, 0.86, 1.0);
+const LOCKED_COLOR = new THREE.Color(0.86, 0.9, 1.0);
 const WHITE = new THREE.Color(1, 1, 1);
 
 interface InstanceRef { mesh: THREE.InstancedMesh; index: number }
@@ -47,22 +47,22 @@ export class World {
 
   constructor(lib: ModelLibrary, quality: { villagers: number; smoke: number }) {
     this.lib = lib;
-    const sky = new THREE.Color('#8fcbea');
-    const horizon = new THREE.Color('#d6eef2');
+    const sky = new THREE.Color('#5aa9e6');
+    const horizon = new THREE.Color('#bfe5f6');
     this.scene.background = skyTexture(sky, horizon);
-    this.scene.fog = new THREE.Fog(horizon, 55, 130);
+    this.scene.fog = new THREE.Fog(horizon, 60, 160);
 
-    this.hemi = new THREE.HemisphereLight(0xe4f2ff, 0x6f8a5c, 1.6);
+    this.hemi = new THREE.HemisphereLight(0xcfe8ff, 0x5f7f48, 1.25);
     this.scene.add(this.hemi);
-    this.sun = new THREE.DirectionalLight(0xffeccc, 2.5);
-    this.sun.position.set(-14, 24, 12);
+    this.sun = new THREE.DirectionalLight(0xfff0d2, 3.1);
+    this.sun.position.set(-20, 22, 6);
     this.sun.target.position.set(0, 0, 0);
     this.sun.castShadow = true;
     const sc = this.sun.shadow.camera;
     sc.left = -19; sc.right = 19; sc.top = 19; sc.bottom = -19; sc.near = 1; sc.far = 70;
     this.sun.shadow.bias = -0.0006;
     this.sun.shadow.normalBias = 0.03;
-    this.sun.shadow.radius = 3;
+    this.sun.shadow.radius = 4;
     this.scene.add(this.sun, this.sun.target);
 
     this.scene.add(createOcean(lib.shared.time, horizon));
@@ -396,6 +396,13 @@ export class World {
     if (!this.reducedMotion) this.birds.update(t);
     this.villagers.update(this.reducedMotion ? dt * 0.4 : dt, t);
     this.smoke.update(dt);
+  }
+
+  /** Keep distance fog behind the island whatever the zoom, so unlocked land is never hazy. */
+  updateFog(cameraDistance: number): void {
+    const f = this.scene.fog as THREE.Fog;
+    f.near = cameraDistance + 22;
+    f.far = cameraDistance + 120;
   }
 
   setPointScale(px: number): void {

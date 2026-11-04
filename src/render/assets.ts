@@ -32,7 +32,7 @@ export class ModelLibrary {
     this.patchWater(this.material);
     this.flagMaterial = new THREE.MeshLambertMaterial({ map: atlas, side: THREE.DoubleSide });
     this.patchFlag(this.flagMaterial);
-    this.cloudMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xb8c4d6, emissiveIntensity: 0.45, transparent: true, opacity: 0.94 });
+    this.cloudMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xc9d6e6, emissiveIntensity: 0.5, transparent: true, opacity: 0.88, depthWrite: false });
     for (const child of [...root.children]) {
       child.traverse((o) => {
         const m = o as THREE.Mesh;
@@ -114,9 +114,9 @@ export class ModelLibrary {
         .replace(
           '#include <map_fragment>',
           `#include <map_fragment>
-          // Fresher, lusher greens: the atlas grass is quite yellow (values are linear here).
-          float grassy = step(diffuseColor.r * 0.92, diffuseColor.g) * step(diffuseColor.b * 1.7, diffuseColor.g) * step(0.2, diffuseColor.r);
-          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.55, 0.93, 0.9), grassy);
+          // A touch more saturation for a sunny, cozy look (cheap, no post-processing).
+          float lum0 = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+          diffuseColor.rgb = max(mix(vec3(lum0), diffuseColor.rgb, 1.04), 0.0);
           // Animated shimmer on river water (low, blue texels only).
           float isWater = step(vWPos.y, -0.04) * step(-0.6, vWPos.y) * smoothstep(0.08, 0.2, diffuseColor.b - diffuseColor.r);
           if (isWater > 0.0) {
@@ -129,6 +129,19 @@ export class ModelLibrary {
         );
     };
     mat.customProgramCacheKey = () => 'ik-water';
+  }
+
+  /** Clouds fade out towards their silhouette so they look soft at the edges. */
+  static patchCloud(mat: THREE.MeshLambertMaterial): void {
+    mat.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <opaque_fragment>',
+        `float rim = abs(dot(normalize(normal), normalize(vViewPosition)));
+        diffuseColor.a *= smoothstep(0.05, 0.55, rim);
+        #include <opaque_fragment>`,
+      );
+    };
+    mat.customProgramCacheKey = () => 'ik-cloud';
   }
 
   private patchFlag(mat: THREE.MeshLambertMaterial): void {

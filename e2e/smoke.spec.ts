@@ -76,3 +76,15 @@ test('bottom navigation opens heroes, quests and options sheets', async ({ page 
   await expect(page.locator('[data-nav="heroes"] span[data-i18n]')).toHaveText('Héros');
   expect(errors, errors.join('\n')).toEqual([]);
 });
+
+test.describe('French phone', () => {
+  test.use({ locale: 'fr-FR' });
+  test('auto-detects French from the browser', async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.goto('/?e2e=1');
+    await page.waitForFunction(() => window.__IK?.ready === true, null, { timeout: 90_000 });
+    await expect(page.locator('[data-nav="kingdom"] span[data-i18n]')).toHaveText('Royaume');
+    await expect(page.locator('#quest')).toContainText('Ferme');
+    expect(errors, errors.join('\n')).toEqual([]);
+  });
+});

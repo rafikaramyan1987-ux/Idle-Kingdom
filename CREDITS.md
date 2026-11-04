@@ -13,7 +13,8 @@ A copy ships with the game as `public/assets/LICENSE-KayKit.txt`. The pack is fe
 Kenney (kenney.nl) packs were the first choice, but kenney.nl refuses downloads from the build environment,
 so with the owner's approval the CC0 KayKit pack was used instead. No Kenney or Quaternius files are included.
 
-All models were converted to a single optimized `kingdom.glb` (meshopt compression, 512px shared atlas).
+All models (red-roof variants for the kingdom) were converted to a single optimized `kingdom.glb` (meshopt compression,
+512px shared atlas). The build step gives only the lime grass hue band of the atlas a fresher green.
 The tiny villagers, birds, smoke, ocean and fog are drawn procedurally in code.
 
 ## Font

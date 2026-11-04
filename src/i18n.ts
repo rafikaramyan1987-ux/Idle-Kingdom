@@ -67,8 +67,13 @@ const FR: Record<Key, string> = {
 let lang: Lang = 'en';
 
 export function detectLang(): Lang {
-  const l = (navigator.languages?.[0] ?? navigator.language ?? 'en').toLowerCase();
-  return l.startsWith('fr') ? 'fr' : 'en';
+  // First supported language in the browser's preference list (fr-FR, fr-CA, fr-BE… -> French).
+  const list = [...(navigator.languages ?? []), navigator.language ?? ''].map((l) => l.toLowerCase());
+  for (const l of list) {
+    if (l.startsWith('fr')) return 'fr';
+    if (l.startsWith('en')) return 'en';
+  }
+  return 'en';
 }
 
 export function setLang(l: Lang): void {

@@ -90,7 +90,7 @@ class App {
     this.platform.onMuteChange = (m) => this.audio.setAdMuted(m);
 
     this.rig.onTap = (x, y) => this.onTap(x, y);
-    this.rig.focus(0, 1.2, window.innerWidth > window.innerHeight ? 22 : 17, true);
+    this.rig.focus(0, 0.9, window.innerWidth > window.innerHeight ? 18 : 13, true);
     window.addEventListener('pointerdown', () => this.audio.unlock(), { capture: true });
     window.addEventListener('keydown', () => this.audio.unlock(), { capture: true });
 
@@ -115,8 +115,9 @@ class App {
     const canvas = document.getElementById('scene') as HTMLCanvasElement;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: tier.antialias, powerPreference: 'high-performance', preserveDrawingBuffer: COVER || E2E });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    // Neutral tone mapping keeps the pack's colours (ACES pushes greens toward olive).
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.shadowMap.autoUpdate = false;
@@ -160,6 +161,7 @@ class App {
     }
     this.world.update(dt, this.clock, this.state, now);
     this.rig.update(dt);
+    this.world.updateFog(this.rig.distance);
     if (this.world.consumeShadowDirty()) this.renderer.shadowMap.needsUpdate = true;
     this.renderer.render(this.world.scene, this.rig.camera);
     this.frames++;
@@ -430,7 +432,7 @@ class App {
         app.world.sync(n, Date.now());
         app.platform.happytime();
         app.audio.unlockLand();
-        app.rig.focus(0, 1.2, 17);
+        app.rig.focus(0, 0.9, 13);
         app.save();
         setTimeout(() => void app.maybeMidgame(), 2000);
       },
@@ -438,7 +440,7 @@ class App {
         const st = app.state.settings;
         if (k === 'sfx') { st.sfx = !!v; app.audio.setSfx(st.sfx); }
         if (k === 'music') { st.music = !!v; app.audio.setMusic(st.music); }
-        if (k === 'lang') { st.lang = v as 'en' | 'fr'; setLang(st.lang); app.ui.translate(); }
+        if (k === 'lang') { st.lang = v as 'en' | 'fr' | 'auto'; setLang(st.lang === 'auto' ? detectLang() : st.lang); app.ui.translate(); }
         if (k === 'quality') {
           st.quality = v as 'auto' | 'high' | 'low';
           app.quality.auto = st.quality === 'auto';
@@ -450,7 +452,7 @@ class App {
         app.state = G.newGame(Date.now(), { settings: { ...app.state.settings } });
         app.world.setUnlocked(app.state.regions, false);
         app.world.sync(app.state, Date.now());
-        app.rig.focus(0, 1.2, 17);
+        app.rig.focus(0, 0.9, 13);
         app.save();
       },
       focusPlot: (plot: number) => app.focusPlot(plot),

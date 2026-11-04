@@ -1,3 +1,4 @@
+import { ModelLibrary } from './assets';
 import * as THREE from 'three';
 import { buildMap, hexDist, hexToWorld, worldToHex } from '../game/map';
 
@@ -81,12 +82,13 @@ export function createOcean(time: { value: number }, fogColor: THREE.Color): THR
         vec3 col = mix(uShallow, uDeep, smoothstep(0.0, 0.35, d));
         // Soft travelling ripples
         float w = sin(vW.x * 0.9 + uTime * 0.7) * sin(vW.z * 0.8 - uTime * 0.55);
-        col += 0.035 * w;
+        col += 0.02 * w;
         // Foam bands near the shore
-        float band = sin(d * 70.0 - uTime * 1.6);
-        float foam = smoothstep(0.65, 1.0, band) * (1.0 - smoothstep(0.03, 0.16, d));
-        foam += 1.0 - smoothstep(0.0, 0.035, d);
-        col = mix(col, vec3(0.96, 0.99, 1.0), clamp(foam, 0.0, 1.0) * 0.85);
+        // One soft foam line that slowly breathes away from the shore, plus a thin rim.
+        float band = sin(d * 38.0 - uTime * 0.9);
+        float foam = smoothstep(0.8, 1.0, band) * (1.0 - smoothstep(0.02, 0.09, d)) * 0.45;
+        foam += (1.0 - smoothstep(0.0, 0.03, d)) * 0.7;
+        col = mix(col, vec3(0.95, 0.99, 1.0), clamp(foam, 0.0, 1.0));
         // Large, slow colour variation so the sea never looks flat.
         col *= 0.96 + 0.06 * sin(vW.x * 0.11 + vW.z * 0.07 + uTime * 0.15);
         float f = smoothstep(40.0, 120.0, vDepth);
@@ -349,7 +351,8 @@ export class RegionClouds {
 
   constructor(cells: { x: number; z: number; seed: number }[], big: { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[], small: { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[], base: THREE.MeshLambertMaterial, fogTex: THREE.Texture) {
     this.material = base.clone();
-    const chosen = cells.filter((c) => c.seed < 0.5);
+    ModelLibrary.patchCloud(this.material);
+    const chosen = cells.filter((c) => c.seed < 0.32);
     const bigCells = chosen.filter((_, i) => i % 2 === 0), smallCells = chosen.filter((_, i) => i % 2 === 1);
     const addSet = (parts: typeof big, list: typeof cells, scale: number): void => {
       const meshIdx = this.meshes.length;
@@ -363,8 +366,8 @@ export class RegionClouds {
       }
       list.forEach((c, i) => this.anchors.push({ x: c.x + (c.seed - 0.2) * 1.2, y: 1.7 + c.seed * 1.2, z: c.z + (0.3 - c.seed) * 1.2, s: scale * (0.75 + c.seed * 0.7), rot: c.seed * 20, seed: c.seed * 50, mesh: meshIdx, index: i }));
     };
-    addSet(big, bigCells, 0.85);
-    addSet(small, smallCells, 1.0);
+    addSet(big, bigCells, 0.55);
+    addSet(small, smallCells, 0.75);
     // Soft fog puffs, one draw call.
     const pos = new Float32Array(cells.length * 3);
     cells.forEach((c, i) => { pos[i * 3] = c.x; pos[i * 3 + 1] = 0.6; pos[i * 3 + 2] = c.z; });
@@ -372,10 +375,10 @@ export class RegionClouds {
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     this.puffMat = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false,
-      uniforms: { uTex: { value: fogTex }, uOpacity: { value: 0.55 }, uScale: { value: 300 }, uTime: { value: 0 } },
+      uniforms: { uTex: { value: fogTex }, uOpacity: { value: 0.3 }, uScale: { value: 300 }, uTime: { value: 0 } },
       vertexShader: /* glsl */ `uniform float uScale; uniform float uTime;
         void main() { vec3 p = position; p.x += sin(uTime * 0.3 + position.z) * 0.3;
-          vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_PointSize = uScale * 3.2 / -mv.z; gl_Position = projectionMatrix * mv; }`,
+          vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_PointSize = uScale * 2.4 / -mv.z; gl_Position = projectionMatrix * mv; }`,
       fragmentShader: /* glsl */ `uniform sampler2D uTex; uniform float uOpacity;
         void main() { vec4 t = texture2D(uTex, gl_PointCoord); gl_FragColor = vec4(vec3(0.95, 0.97, 1.0), t.a * uOpacity); }`,
     });
@@ -409,8 +412,8 @@ export class RegionClouds {
     const k = 1 - Math.pow(1 - this.fade, 3);
     this.group.visible = this.fade < 1;
     if (!this.group.visible) return;
-    this.material.opacity = 0.95 * (1 - k);
-    this.puffMat.uniforms.uOpacity.value = 0.55 * (1 - k);
+    this.material.opacity = 0.88 * (1 - k);
+    this.puffMat.uniforms.uOpacity.value = 0.3 * (1 - k);
     this.puffMat.uniforms.uTime.value = t;
     if (!reducedMotion || this.clearing) this.layout(t, k);
   }

@@ -61,11 +61,11 @@ const RECIPES: Record<Exclude<BuildingType, 'walls'>, Recipe[]> = {
     { main: 'building_blacksmith', scale: 1.0, pieces: [['weaponrack', -0.55, 0.5, 30, 1.2], ['barrel', 0.62, 0.5, 0, 1.2], ['bucket_water', 0.45, 0.68, 0, 1.3], ['resource_stone', -0.65, -0.3, 0, 0.9], ['flag', -0.1, -0.75, 90, 2.4]], smoke: [[0.32, 1.04, -0.05]] },
   ],
   castle: [
-    { main: 'building_castle', scale: 1.1, pieces: [] },
-    { main: 'building_castle', scale: 1.0, pieces: [['flag', -0.85, 0.5, 90, 3], ['flag', 0.85, 0.5, 90, 3]] },
-    { main: 'building_castle', scale: 1.05, pieces: [['flag', -0.85, 0.5, 90, 3], ['flag', 0.85, 0.5, 90, 3], ['barrel', 0.7, 0.75, 0, 1.2], ['crate_A_big', -0.72, 0.75, 20, 1]] },
-    { main: 'building_castle', scale: 0.95, pieces: [['flag', -0.85, 0.5, 90, 3.4], ['flag', 0.85, 0.5, 90, 3.4], ['flag', 0, -0.95, 90, 3.4], ['barrel', 0.7, 0.75, 0, 1.2], ['crate_A_big', -0.72, 0.75, 20, 1]] },
-    { main: 'building_castle', scale: 1.15, pieces: [['flag', -0.85, 0.5, 90, 3.8], ['flag', 0.85, 0.5, 90, 3.8], ['flag', -0.8, -0.6, 90, 3.8], ['flag', 0.8, -0.6, 90, 3.8], ['barrel', 0.7, 0.8, 0, 1.2]] },
+    { main: 'building_castle', scale: 1.32, pieces: [] },
+    { main: 'building_castle', scale: 1.24, pieces: [['flag', -0.85, 0.5, 90, 3], ['flag', 0.85, 0.5, 90, 3]] },
+    { main: 'building_castle', scale: 1.28, pieces: [['flag', -0.85, 0.5, 90, 3], ['flag', 0.85, 0.5, 90, 3], ['barrel', 0.7, 0.75, 0, 1.2], ['crate_A_big', -0.72, 0.75, 20, 1]] },
+    { main: 'building_castle', scale: 1.2, pieces: [['flag', -0.85, 0.5, 90, 3.4], ['flag', 0.85, 0.5, 90, 3.4], ['flag', 0, -0.95, 90, 3.4], ['barrel', 0.7, 0.75, 0, 1.2], ['crate_A_big', -0.72, 0.75, 20, 1]] },
+    { main: 'building_castle', scale: 1.36, pieces: [['flag', -0.85, 0.5, 90, 3.8], ['flag', 0.85, 0.5, 90, 3.8], ['flag', -0.8, -0.6, 90, 3.8], ['flag', 0.8, -0.6, 90, 3.8], ['barrel', 0.7, 0.8, 0, 1.2]] },
   ],
 };
 

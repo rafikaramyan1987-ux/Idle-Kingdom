@@ -453,7 +453,7 @@ export class UI {
     return `<h2>${t('ui.optionsTitle')}</h2>
       <div class="opt">${icon('sound')}<span>${t('ui.sound')}</span>${seg('sfx', [['true', t('ui.on')], ['false', t('ui.off')]], String(st.sfx))}</div>
       <div class="opt">${icon('music')}<span>${t('ui.music')}</span>${seg('music', [['true', t('ui.on')], ['false', t('ui.off')]], String(st.music))}</div>
-      <div class="opt">${icon('globe')}<span>${t('ui.language')}</span>${seg('lang', [['en', 'EN'], ['fr', 'FR']], getLang())}</div>
+      <div class="opt">${icon('globe')}<span>${t('ui.language')}</span>${seg('lang', [['auto', t('ui.auto')], ['en', 'EN'], ['fr', 'FR']], s.settings.lang)}</div>
       <div class="opt">${icon('sparkle')}<span>${t('ui.graphics')}</span>${seg('quality', [['auto', t('ui.auto')], ['high', t('ui.high')], ['low', t('ui.low')]], st.quality)}</div>
       <div class="opt-links"><button class="btn soft small" data-action="credits">${t('ui.credits')}</button><button class="btn danger small" data-action="reset">${t('ui.reset')}</button></div>`;
   }
