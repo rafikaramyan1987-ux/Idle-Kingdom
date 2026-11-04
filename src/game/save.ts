@@ -41,6 +41,8 @@ export function deserialize(raw: string | null, now: number): GameState | null {
   }
   if (!s.buildings.some((b) => b.type === 'castle')) return null;
   if (!Array.isArray(s.regions) || !s.regions.includes(0)) s.regions = [0];
+  if (!Array.isArray(s.goalsDone)) s.goalsDone = [];
+  if (!isNum(s.idleSince)) s.idleSince = s.play;
   if (!isNum(s.lastSeen) || s.lastSeen > now) s.lastSeen = now;
   return s;
 }

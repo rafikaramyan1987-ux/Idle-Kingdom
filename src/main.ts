@@ -354,6 +354,7 @@ class App {
       case 'goal': this.audio.complete(); this.ui.toast(`${t('ui.goal')} ✓ ${tk(`g.${G.GOALS[e.index].id}`)}`, '🎯'); break;
       case 'market': if (G.buildingOf(this.state, 'market')) this.ui.toast(t('ui.marketNew'), '🏪'); break;
       case 'task': this.ui.toast(t('ui.taskDone'), '📋'); break;
+      case 'campSpotted': this.ui.toast(t('ui.campSpotted'), '💀'); this.audio.error(); { const nr = G.nextRegion(this.state); if (nr !== null) this.focusRegion(nr); } break;
       case 'gift': this.ui.toast(t('ui.giftT'), '🎀'); this.ui.fly({ x: window.innerWidth / 2, y: window.innerHeight * 0.45 }, '🪙', 'gold', 3); break;
       case 'order': break;
     }
@@ -679,7 +680,8 @@ class App {
 
   private goalGo(): void {
     const s = this.state;
-    const goal = G.GOALS[s.tutorial]?.id ?? 'daily';
+    const view = G.currentGoal(s);
+    const goal = view.kind === 'goal' ? view.goal.id : view.kind;
     const openType = (type: BType): boolean => {
       const b = s.buildings.find((x) => x.type === type);
       if (!b) return false;
@@ -700,8 +702,12 @@ class App {
         return;
       }
       case 'flour': case 'bread': openType('bakery'); return;
-      case 'order': this.ui.open({ kind: 'orders' }); return;
-      case 'coop': case 'mine': case 'forge': case 'barracks': if (!openType(goal as BType)) emptyPlot(); return;
+      case 'order': case 'levelup': this.ui.open({ kind: 'orders' }); return;
+      case 'field': emptyPlot(); return;
+      case 'egg': openType('coop'); return;
+      case 'pie': if (!openType('kitchen')) emptyPlot(); return;
+      case 'corn': { const f = s.buildings.find((b) => b.type === 'field' && !b.jobs.length && !b.ready.length) ?? s.buildings.find((b) => b.type === 'field'); if (f) { const p = this.world.plotPosition(f.plot); this.rig.focus(p.x, p.z + 1.2, 11); this.ui.open({ kind: 'building', id: f.id }); } return; }
+      case 'coop': case 'mine': case 'forge': case 'barracks': case 'kitchen': if (!openType(goal as BType)) emptyPlot(); return;
       case 'sword': if (!openType('forge')) emptyPlot(); return;
       case 'soldier': if (!openType('barracks')) emptyPlot(); return;
       case 'camp': case 'camp2': { const nr = G.nextRegion(s); if (nr !== null) { this.focusRegion(nr); this.ui.openCamp(nr); } return; }
@@ -772,7 +778,7 @@ class App {
       },
       startCamp: (r: number) => app.startCamp(r, []),
       /** Tests only: skip the tutorial gate and give some progress. */
-      cheat(level: number) { app.state.level = Math.max(app.state.level, level); app.state.tutorial = Math.max(app.state.tutorial, 6); app.state.gold += 500; },
+      cheat(level: number) { app.state.level = Math.max(app.state.level, level); if (!app.state.goalsDone.includes('order')) app.state.goalsDone.push('order'); app.state.play = Math.max(app.state.play, G.CAMP1_AT); app.state.raidAt = app.state.play + 300; app.state.gold += 500; },
       raid: () => app.startRaidNow(),
       get battleActive() { return !!app.active; },
     };
