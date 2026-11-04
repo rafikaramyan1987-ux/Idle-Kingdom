@@ -80,6 +80,7 @@ export class UI {
         <button class="pill barn" data-nav="barn"><span class="emo">📦</span><b>0</b></button>
         <button class="round opt" data-action="options" aria-label="options">⚙️</button>
       </header>
+      <button class="next-unlock" id="next-unlock" data-action="tasks"></button>
       <div class="side left" id="side-left"></div>
       <div class="side right"><button class="side-btn" data-action="tasks"><span class="emo">📋</span><i class="mini-bar"><i></i></i></button><button class="side-btn" data-action="event"><span class="emo">🏆</span></button></div>
       <div class="banner hidden" id="banner"></div>
@@ -352,7 +353,7 @@ export class UI {
       const outs = G.recipesFor(type).slice(0, 4).map((r) => icon(r.out)).join('');
       return `<button class="card build-card ${c.ok ? '' : 'disabled'} ${locked ? 'locked' : ''}" data-action="build" data-arg="${type}|${plot}" data-build="${type}">
         <img class="thumb" src="${this.a.thumbnail(type)}" alt=""/><div class="card-main"><div class="card-title">${bn(type)}</div><div class="outs">${outs}</div>
-        <div class="chips small">${locked ? `<span class="chip">🔒 ${t('ui.locked', { n: d.level })}</span>` : limit ? `<span class="chip">${t('ui.limit')}</span>` : bagChips(cost, s)}</div></div></button>`;
+        <div class="chips small">${locked ? `<span class="chip">🔒 ${t('ui.locked', { n: d.level })}</span>` : limit ? `<span class="chip">${type === 'field' ? t('ui.moreAt', { n: s.level + 1 }) : t('ui.limit')}</span>` : bagChips(cost, s)}</div></div></button>`;
     }).join('');
     return `<h2>${t('ui.buildHere')}</h2><div class="cards">${cards}</div>`;
   }
@@ -575,6 +576,9 @@ export class UI {
       this.hudSig = sig;
       const q = (sel: string) => this.root.querySelector<HTMLElement>(sel)!;
       q('.lvl b').textContent = String(s.level);
+      const nu = G.nextUnlocks(s);
+      const names = [...nu.buildings.map((b) => bn(b)), ...nu.items.slice(0, 3).map((i) => iname(i))].slice(0, 3).join(', ');
+      q('#next-unlock').innerHTML = `<b>${t('ui.level', { n: nu.level })}</b>${names ? `: ${names}` : ''} · ${XP}${t('ui.xpLeft', { n: nu.xpLeft })}`;
       q('.lvl .ring').style.setProperty('--p', `${pct}%`);
       q('.pill.gold b').textContent = formatNumber(s.gold);
       q('.pill.gems b').textContent = String(s.gems);
@@ -602,14 +606,17 @@ export class UI {
   }
 
   private updateGoal(s: GameState): void {
-    const goal = G.GOALS[s.tutorial];
-    const id = goal ? goal.id : 'daily';
-    const sig = `${id}|${getLang()}|${G.dailyPercent(s)}`;
+    const view = G.currentGoal(s);
+    const xpLeft = view.kind === 'levelup' ? view.xpLeft : 0;
+    const sig = `${view.kind === 'goal' ? view.goal.id : view.kind}|${xpLeft}|${getLang()}|${G.dailyPercent(s)}`;
     if (sig === this.goalSig) return;
     this.goalSig = sig;
     const el = this.root.querySelector<HTMLElement>('#goal')!;
-    el.innerHTML = `<span class="emo g-ic">🎯</span><div class="g-main"><small>${t('ui.goal')}</small><b>${tk(`g.${id}`)}</b></div>
-      ${goal ? `<span class="chip good">${GOLD}+${goal.gold}</span>` : `<span class="chip">${G.dailyPercent(s)}%</span>`}<button class="btn soft small" data-action="goalGo">${t('ui.go')}</button>`;
+    let text: string, chip: string;
+    if (view.kind === 'goal') { text = tk(`g.${view.goal.id}`); chip = `<span class="chip good">${GOLD}+${view.goal.gold}</span>`; }
+    else if (view.kind === 'levelup') { text = t('g.levelup', { n: view.level }); chip = `<span class="chip">${XP}${t('ui.xpLeft', { n: view.xpLeft })}</span>`; }
+    else { text = tk('g.daily'); chip = `<span class="chip">${G.dailyPercent(s)}%</span>`; }
+    el.innerHTML = `<span class="emo g-ic">🎯</span><div class="g-main"><small>${t('ui.goal')}</small><b>${text}</b></div>${chip}<button class="btn soft small" data-action="goalGo">${t('ui.go')}</button>`;
   }
 
   // ---------- Bubbles over the map ----------
@@ -625,7 +632,7 @@ export class UI {
       } else if (b.ready.length) {
         const outs = [...new Set(b.ready.map((r) => G.recipe(r).out))].slice(0, 3);
         want.set(`b${b.id}`, { pos, html: outs.map((o) => icon(o)).join('') + (b.ready.length > 1 ? `<i class="n">${b.ready.length}</i>` : ''), cls: 'bub ready', spec: `ready:${b.id}` });
-      } else if (b.type === 'field' && !b.jobs.length && s.tutorial <= 1) {
+      } else if (b.type === 'field' && !b.jobs.length && !s.goalsDone.includes('harvest')) {
         want.set(`b${b.id}`, { pos, html: '🌱', cls: 'bub hint', spec: `open:${b.id}` });
       } else if (b.type === 'orders' && s.orders.some((o) => G.canDeliver(s, o, now))) {
         want.set(`b${b.id}`, { pos, html: '📜<b>✓</b>', cls: 'bub ready', spec: 'orders' });
@@ -637,7 +644,9 @@ export class UI {
       const c = map.camps[nr]!;
       const ep = G.campPower(nr), sp = G.squadPower(s, now);
       const lock = s.level < campLevel(nr) || !G.canAttack(s, nr, now).ok;
-      want.set(`camp${nr}`, { pos: this.a.cellAnchor(c.q, c.r, 1.3), html: lock ? `🔒<b>${t('ui.locked', { n: campLevel(nr) })}</b>` : `⚔️<b>${ep}</b>`, cls: `bub camp ${lock ? 'lock' : sp >= ep ? 'ok' : 'hard'}`, spec: `camp:${nr}` });
+      const wait = nr === 1 && s.level >= campLevel(nr) && s.play < G.CAMP1_AT ? G.CAMP1_AT - s.play : 0;
+      const label = wait > 0 ? `⏳<b>${formatDuration(wait)}</b>` : lock ? `🔒<b>${t('ui.locked', { n: campLevel(nr) })}</b>` : `⚔️<b>${ep}</b>`;
+      want.set(`camp${nr}`, { pos: this.a.cellAnchor(c.q, c.r, 1.3), html: label, cls: `bub camp ${lock ? 'lock' : sp >= ep ? 'ok' : 'hard'}`, spec: `camp:${nr}` });
     }
     for (const c of s.chests) want.set(`chest${c.id}`, { pos: this.a.cellAnchor(c.q, c.r, 0.9), html: c.big ? '💰' : '🎁', cls: 'bub chest', spec: `chest:${c.id}` });
     for (const r of map.ruins) if (s.regions.includes(r.region) && !s.ruinsDone.includes(r.region)) want.set(`ruins${r.region}`, { pos: this.a.cellAnchor(r.q, r.r, 1.1), html: '🏚️', cls: 'bub ruins', spec: `ruins:${r.region}` });

@@ -50,7 +50,12 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 .pill.bump { animation: bump 0.35s ease; }
 @keyframes bump { 40% { transform: scale(1.12); } }
 .round { flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 250, 240, 0.95); box-shadow: 0 3px 10px rgba(60, 40, 10, 0.2); font-size: 18px; }
-.side { position: absolute; top: calc(66px + var(--safe-top)); display: flex; flex-direction: column; gap: 8px; }
+.next-unlock { position: absolute; top: max(60px, calc(56px + var(--safe-top))); left: max(8px, var(--safe-left)); max-width: calc(100% - 80px); padding: 3px 10px; border-radius: 999px;
+  background: rgba(255, 250, 240, 0.92); box-shadow: 0 2px 8px rgba(60, 40, 10, 0.15); font-size: 12px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: auto; }
+.next-unlock b { color: #7a5200; }
+.next-unlock .emo { font-size: 12px; }
+.in-battle .next-unlock { opacity: 0; }
+.side { position: absolute; top: calc(90px + var(--safe-top)); display: flex; flex-direction: column; gap: 8px; }
 .side.left { left: max(8px, var(--safe-left)); align-items: flex-start; }
 .side.right { right: max(8px, var(--safe-right)); }
 .side-btn { position: relative; width: 46px; height: 46px; border-radius: 15px; display: grid; place-items: center; background: rgba(255, 250, 240, 0.95); box-shadow: 0 3px 10px rgba(60, 40, 10, 0.2); font-size: 24px; }
@@ -60,7 +65,7 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 .timer-pill.boost { background: linear-gradient(180deg, #ffe17a, #ffc94a); }
 .timer-pill.raid { background: #ffe1dc; color: #b8392e; animation: pulse 1s infinite; }
 
-.banner { position: absolute; top: calc(118px + var(--safe-top)); left: 50%; transform: translateX(-50%); padding: 8px 18px; border-radius: 16px; font-weight: 600; font-size: 17px; color: #fff;
+.banner { position: absolute; top: calc(140px + var(--safe-top)); left: 50%; transform: translateX(-50%); padding: 8px 18px; border-radius: 16px; font-weight: 600; font-size: 17px; color: #fff;
   background: linear-gradient(180deg, #ef6b5d, #c8392e); box-shadow: 0 4px 0 #8f2a22, var(--shadow); animation: pulse 1s infinite; white-space: nowrap; }
 
 /* ---------- Bubbles ---------- */

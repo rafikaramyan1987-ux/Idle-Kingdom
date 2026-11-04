@@ -57,18 +57,18 @@ export interface Recipe {
 
 export const RECIPES: Recipe[] = [
   // Fields: plant -> grow -> harvest 2
-  { id: 'wheat', building: 'field', inputs: {}, out: 'wheat', qty: 2, time: 20, xp: 1, level: 1, gold: 1 },
-  { id: 'corn', building: 'field', inputs: {}, out: 'corn', qty: 2, time: 60, xp: 2, level: 3, gold: 3 },
+  { id: 'wheat', building: 'field', inputs: {}, out: 'wheat', qty: 2, time: 20, xp: 2, level: 1, gold: 1 },
+  { id: 'corn', building: 'field', inputs: {}, out: 'corn', qty: 2, time: 45, xp: 3, level: 2, gold: 3 },
   { id: 'carrot', building: 'field', inputs: {}, out: 'carrot', qty: 2, time: 120, xp: 3, level: 5, gold: 5 },
   { id: 'cotton', building: 'field', inputs: {}, out: 'cotton', qty: 2, time: 180, xp: 4, level: 6, gold: 7 },
   // Animals (each animal works in parallel, eating one feed)
-  { id: 'egg', building: 'coop', inputs: { wheat: 1 }, out: 'egg', qty: 1, time: 40, xp: 2, level: 2 },
+  { id: 'egg', building: 'coop', inputs: { wheat: 1 }, out: 'egg', qty: 1, time: 30, xp: 2, level: 1 },
   { id: 'milk', building: 'pasture', inputs: { corn: 1 }, out: 'milk', qty: 1, time: 80, xp: 3, level: 4 },
   { id: 'wool', building: 'sheep', inputs: { carrot: 1 }, out: 'wool', qty: 1, time: 140, xp: 4, level: 6 },
   // Raw materials
-  { id: 'wood', building: 'lumber', inputs: {}, out: 'wood', qty: 2, time: 25, xp: 1, level: 1 },
-  { id: 'stone', building: 'mine', inputs: {}, out: 'stone', qty: 2, time: 35, xp: 1, level: 2 },
-  { id: 'ore', building: 'mine', inputs: {}, out: 'ore', qty: 1, time: 45, xp: 2, level: 3 },
+  { id: 'wood', building: 'lumber', inputs: {}, out: 'wood', qty: 2, time: 25, xp: 2, level: 1 },
+  { id: 'stone', building: 'mine', inputs: {}, out: 'stone', qty: 2, time: 30, xp: 2, level: 1 },
+  { id: 'ore', building: 'mine', inputs: {}, out: 'ore', qty: 2, time: 40, xp: 2, level: 2 },
   // Factories
   { id: 'flour', building: 'bakery', inputs: { wheat: 2 }, out: 'flour', qty: 1, time: 12, xp: 2, level: 1 },
   { id: 'bread', building: 'bakery', inputs: { flour: 1, wheat: 1 }, out: 'bread', qty: 1, time: 20, xp: 3, level: 1 },
@@ -81,7 +81,7 @@ export const RECIPES: Recipe[] = [
   { id: 'staff', building: 'forge', inputs: { wood: 2, ore: 2 }, out: 'staff', qty: 1, time: 80, xp: 9, level: 6 },
   { id: 'cloth', building: 'weaver', inputs: { cotton: 2 }, out: 'cloth', qty: 1, time: 90, xp: 7, level: 6 },
   { id: 'banner', building: 'weaver', inputs: { cloth: 1, wool: 1 }, out: 'banner', qty: 1, time: 150, xp: 12, level: 7 },
-  { id: 'pie', building: 'kitchen', inputs: { flour: 1, egg: 2 }, out: 'pie', qty: 1, time: 35, xp: 5, level: 3 },
+  { id: 'pie', building: 'kitchen', inputs: { flour: 1, egg: 2 }, out: 'pie', qty: 1, time: 30, xp: 5, level: 2 },
   { id: 'stew', building: 'kitchen', inputs: { carrot: 1, corn: 1 }, out: 'stew', qty: 1, time: 60, xp: 6, level: 5 },
   // Army orders
   { id: 'soldier', building: 'barracks', inputs: { sword: 1, bread: 2 }, out: 'soldier', qty: 1, time: 30, xp: 8, level: 4 },
@@ -113,13 +113,13 @@ export const BUILDINGS: Record<BType, BuildingDef> = {
   walls: { type: 'walls', kind: 'special', level: 1, cost: { gold: 0 }, build: 0, slots: 0, max: one, model: 'wall_straight' },
   barn: { type: 'barn', kind: 'special', level: 1, cost: { gold: 0 }, build: 0, slots: 0, max: one, model: 'building_home_B' },
   orders: { type: 'orders', kind: 'special', level: 1, cost: { gold: 0 }, build: 0, slots: 0, max: one, model: 'tent' },
-  field: { type: 'field', kind: 'field', level: 1, cost: { gold: 15 }, build: 4, slots: 1, max: (l) => Math.min(12, 2 + l), model: 'building_grain' },
+  field: { type: 'field', kind: 'field', level: 1, cost: { gold: 15 }, build: 4, slots: 1, max: (l) => Math.min(12, 4 + l), model: 'building_grain' },
   lumber: { type: 'lumber', kind: 'factory', level: 1, cost: { gold: 40 }, build: 10, slots: 3, max: one, model: 'building_lumbermill' },
   bakery: { type: 'bakery', kind: 'factory', level: 1, cost: { gold: 40 }, build: 10, slots: 3, max: one, model: 'building_windmill' },
-  coop: { type: 'coop', kind: 'animal', level: 2, cost: { gold: 100, wood: 6 }, build: 12, slots: 3, max: one, model: 'coop' },
-  mine: { type: 'mine', kind: 'factory', level: 2, cost: { gold: 90, wood: 6 }, build: 15, slots: 3, max: one, model: 'building_mine' },
+  coop: { type: 'coop', kind: 'animal', level: 1, cost: { gold: 60, wood: 4 }, build: 10, slots: 3, max: one, model: 'coop' },
+  mine: { type: 'mine', kind: 'factory', level: 1, cost: { gold: 70, wood: 6 }, build: 12, slots: 3, max: one, model: 'building_mine' },
   forge: { type: 'forge', kind: 'factory', level: 3, cost: { gold: 140, wood: 8, stone: 6 }, build: 20, slots: 3, max: one, model: 'building_blacksmith' },
-  kitchen: { type: 'kitchen', kind: 'factory', level: 3, cost: { gold: 120, wood: 8, stone: 4 }, build: 20, slots: 3, max: one, model: 'building_tavern' },
+  kitchen: { type: 'kitchen', kind: 'factory', level: 2, cost: { gold: 110, wood: 8, stone: 4 }, build: 15, slots: 3, max: one, model: 'building_tavern' },
   pasture: { type: 'pasture', kind: 'animal', level: 4, cost: { gold: 220, wood: 12 }, build: 25, slots: 3, max: one, model: 'pasture' },
   barracks: { type: 'barracks', kind: 'factory', level: 4, cost: { gold: 260, wood: 14, stone: 14 }, build: 25, slots: 3, max: one, model: 'building_barracks' },
   market: { type: 'market', kind: 'special', level: 4, cost: { gold: 200, wood: 10 }, build: 20, slots: 0, max: one, model: 'building_market' },
@@ -198,7 +198,7 @@ export const ITEM_XP_RATIO = 0.25;
 export function xpForLevel(level: number): number {
   // Total XP needed to reach `level` (level 1 = 0).
   if (level <= 1) return 0;
-  return Math.round(80 * Math.pow(level - 1, 1.6));
+  return Math.round(80 * Math.pow(level - 1, 1.9));
 }
 
 export const BARN_BASE = 60;

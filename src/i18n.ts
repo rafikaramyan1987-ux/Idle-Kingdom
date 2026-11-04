@@ -59,6 +59,8 @@ const EN = {
   'g.order': 'Deliver an order', 'g.coop': 'Build a chicken coop', 'g.camp': 'Defeat the skeleton camp', 'g.chest': 'Open a treasure chest',
   'g.raid': 'Defend against a raid', 'g.hero': 'Recruit a new hero', 'g.mine': 'Build a mine', 'g.forge': 'Build a forge',
   'g.sword': 'Forge a sword', 'g.barracks': 'Build barracks', 'g.soldier': 'Train a soldier', 'g.camp2': 'Clear a second camp', 'g.daily': 'Finish your daily tasks',
+  'g.levelup': 'Reach level {n}: deliver orders and make goods', 'ui.xpLeft': '{n} XP left', 'ui.campSpotted': 'A skeleton camp was spotted!', 'ui.moreAt': 'More fields at Lv {n}',
+  'g.field': 'Build a third field', 'g.egg': 'Feed the chickens and collect eggs', 'g.kitchen': 'Build a kitchen', 'g.pie': 'Cook an egg pie', 'g.corn': 'Grow corn',
 } as const;
 
 export type Key = keyof typeof EN;
@@ -116,6 +118,8 @@ const FR: Record<Key, string> = {
   'g.order': 'Livrez une commande', 'g.coop': 'Construisez un poulailler', 'g.camp': 'Battez le camp de squelettes', 'g.chest': 'Ouvrez un coffre',
   'g.raid': 'Défendez un raid', 'g.hero': 'Recrutez un héros', 'g.mine': 'Construisez une mine', 'g.forge': 'Construisez une forge',
   'g.sword': 'Forgez une épée', 'g.barracks': 'Construisez la caserne', 'g.soldier': 'Entraînez un soldat', 'g.camp2': 'Battez un deuxième camp', 'g.daily': 'Finissez vos tâches du jour',
+  'g.levelup': 'Atteignez le niveau {n} : livrez des commandes et fabriquez', 'ui.xpLeft': 'encore {n} XP', 'ui.campSpotted': 'Un camp de squelettes est en vue !', 'ui.moreAt': 'Plus de champs au niv {n}',
+  'g.field': 'Construisez un troisième champ', 'g.egg': 'Nourrissez les poules et ramassez les œufs', 'g.kitchen': 'Construisez une cuisine', 'g.pie': 'Cuisinez une tourte', 'g.corn': 'Cultivez du maïs',
 };
 
 let lang: Lang = 'en';

@@ -176,3 +176,38 @@ describe('offline, levels, format', () => {
     expect(formatDuration(65)).toBe('1m 05s');
   });
 });
+
+describe('no dead ends early on', () => {
+  it('a fresh save always has useful actions', () => {
+    const s = G.newGame(T0);
+    expect(G.usefulActions(s, T0).length).toBeGreaterThan(0);
+  });
+  it('level 1 allows 5 fields, a coop and a mine', () => {
+    expect(BUILDINGS.field.max(1)).toBeGreaterThanOrEqual(5);
+    expect(BUILDINGS.coop.level).toBe(1);
+    expect(BUILDINGS.mine.level).toBe(1);
+  });
+  it('the objective never points at something locked; otherwise it says how to level up', () => {
+    const s = G.newGame(T0);
+    s.goalsDone = G.GOALS.filter((g) => g.level === 1).map((g) => g.id);
+    const view = G.currentGoal(s);
+    expect(view.kind).toBe('levelup');
+    if (view.kind === 'levelup') { expect(view.level).toBe(2); expect(view.xpLeft).toBeGreaterThan(0); }
+    for (let lvl = 1; lvl <= 6; lvl++) {
+      s.level = lvl;
+      const v = G.currentGoal(s);
+      if (v.kind === 'goal') expect(v.goal.level).toBeLessThanOrEqual(lvl);
+    }
+  });
+  it('goals are ordered by unlock level (time-gated ones excepted)', () => {
+    let lvl = 1;
+    for (const g of G.GOALS) { if (!g.ready) { expect(g.level).toBeGreaterThanOrEqual(lvl); lvl = g.level; } }
+  });
+  it('next unlock hint lists what level 2 brings', () => {
+    const s = G.newGame(T0);
+    const n = G.nextUnlocks(s);
+    expect(n.level).toBe(2);
+    expect(n.buildings).toContain('kitchen');
+    expect(n.xpLeft).toBe(xpForLevel(2));
+  });
+});

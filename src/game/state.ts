@@ -10,6 +10,7 @@ import { buildMap, hexDist, key } from './map';
 import { Rng } from './rng';
 
 export const SAVE_VERSION = 2;
+export const CAMP1_AT = 150;
 export const CASTLE_PLOT = -2;
 export const WALLS_PLOT = -1;
 
@@ -73,6 +74,9 @@ export interface GameState {
   stats: Record<string, number>;
   made: Record<string, number>;
   tutorial: number;
+  goalsDone: string[];
+  /** Play time since which the player had nothing useful to do. */
+  idleSince: number;
   seed: number;
   play: number;
   taxAcc: number;
@@ -101,6 +105,7 @@ export type GameEvent =
   | { type: 'barnFull' }
   | { type: 'goal'; index: number }
   | { type: 'market' }
+  | { type: 'campSpotted' }
   | { type: 'task'; kind: Task['kind'] }
   | { type: 'gift'; gold: number; item?: ItemId; qty?: number };
 
@@ -120,7 +125,7 @@ export function newGame(now: number, keep?: Partial<GameState>): GameState {
     market: { offers: [], refreshAt: 0 }, research: zeroResearch(), decor: [], skin: 'red', skins: ['red'],
     extraSlots: {}, boostUntil: 0, ruinsDone: [],
     daily: { day: '', tasks: [], claimed: false }, weekly: { week: '', points: 0, pending: 0 },
-    stats: {}, made: {}, tutorial: 0, seed: 12345, play: 0, taxAcc: 0, calmSince: 0, lastSeen: now, createdAt: now, nextId: 1,
+    stats: {}, made: {}, tutorial: 0, goalsDone: [], idleSince: 0, seed: 12345, play: 0, taxAcc: 0, calmSince: 0, lastSeen: now, createdAt: now, nextId: 1,
     settings: { sfx: true, music: true, lang: 'auto', quality: 'auto' },
     ...keep,
   };
@@ -247,7 +252,7 @@ export function build(s: GameState, type: BType, plot: number, now: number): Res
   take(s, items as Bag);
   const t = BUILDINGS[type].build * (1 - RESEARCH.building.effect * s.research.building);
   s.buildings.push({ id: s.nextId++, type, plot, level: 1, buildStart: now, buildEnd: now + t * 1000, jobs: [], ready: [] });
-  addXp(s, 3 + BUILDINGS[type].level * 2);
+  addXp(s, 3 + BUILDINGS[type].level * 2 + (owned(s, type) === 1 ? 5 : 0));
   return { ok: true };
 }
 
@@ -317,6 +322,7 @@ export function collect(s: GameState, buildingId: number): Bag & { soldier?: num
     got[r.out] = (got[r.out] ?? 0) + stored;
     addXp(s, r.xp);
     s.made[r.id] = (s.made[r.id] ?? 0) + 1;
+    if (s.made[r.id] === 1) addXp(s, 4); // first time making something new
     const cat = ITEMS[r.out].cat;
     if (cat === 'crops') { bump(s, 'crops', stored); taskProgress(s, 'harvest', stored); }
     else { bump(s, 'goods', stored); taskProgress(s, 'produce', stored); }
@@ -560,7 +566,8 @@ export function canAttack(s: GameState, region: number, now: number): Result {
   if (nextRegion(s) !== region) return { ok: false, reason: 'invalid' };
   if (s.level < campLevel(region)) return { ok: false, reason: 'level' };
   // The first camp wakes up once the farm is running (after the coop goal).
-  if (region === 1 && s.tutorial < GOALS.findIndex((g) => g.id === 'camp')) return { ok: false, reason: 'level' };
+  // The first camp is spotted a little later, once the farm is running.
+  if (region === 1 && (!s.goalsDone.includes('order') || s.play < CAMP1_AT)) return { ok: false, reason: 'level' };
   if (!squad(s, now).length) return { ok: false, reason: 'busy' };
   return { ok: true };
 }
@@ -897,42 +904,93 @@ export function claimWeekly(s: GameState): number {
   return g;
 }
 
-// ---------- Tutorial goals ----------
-export interface Goal { id: string; done: (s: GameState) => boolean; gold: number }
+// ---------- Goals (always something reachable) ----------
+export interface Goal { id: string; level: number; done: (s: GameState) => boolean; ready?: (s: GameState) => boolean; gold: number }
+/** Ordered by unlock level. A goal is offered only when it is unlocked and possible right now. */
 export const GOALS: Goal[] = [
-  { id: 'plant', done: (s) => s.buildings.some((b) => b.type === 'field' && (b.jobs.length > 0 || b.ready.length > 0)) || stat(s, 'crops') > 0, gold: 5 },
-  { id: 'harvest', done: (s) => stat(s, 'crops') >= 2, gold: 5 },
-  { id: 'flour', done: (s) => (s.made.flour ?? 0) >= 1, gold: 10 },
-  { id: 'bread', done: (s) => (s.made.bread ?? 0) >= 1, gold: 10 },
-  { id: 'order', done: (s) => stat(s, 'orders') >= 1, gold: 15 },
-  { id: 'coop', done: (s) => owned(s, 'coop') >= 1, gold: 15 },
-  { id: 'camp', done: (s) => s.regions.length >= 2, gold: 20 },
-  { id: 'chest', done: (s) => stat(s, 'chests') >= 1, gold: 15 },
-  { id: 'raid', done: (s) => stat(s, 'raids') + stat(s, 'raidsLost') >= 1, gold: 20 },
-  { id: 'hero', done: (s) => Object.keys(s.heroes).length >= 2, gold: 20 },
-  { id: 'mine', done: (s) => owned(s, 'mine') >= 1, gold: 20 },
-  { id: 'forge', done: (s) => owned(s, 'forge') >= 1, gold: 25 },
-  { id: 'sword', done: (s) => (s.made.sword ?? 0) >= 1, gold: 25 },
-  { id: 'barracks', done: (s) => owned(s, 'barracks') >= 1, gold: 30 },
-  { id: 'soldier', done: (s) => s.troops.soldier + stat(s, 'troopsLost') >= 1 || (s.made.soldier ?? 0) >= 1, gold: 30 },
-  { id: 'camp2', done: (s) => s.regions.length >= 3, gold: 40 },
+  { id: 'plant', level: 1, done: (s) => s.buildings.some((b) => b.type === 'field' && (b.jobs.length > 0 || b.ready.length > 0)) || stat(s, 'crops') > 0, gold: 5 },
+  { id: 'harvest', level: 1, done: (s) => stat(s, 'crops') >= 2, gold: 5 },
+  { id: 'flour', level: 1, done: (s) => (s.made.flour ?? 0) >= 1, gold: 10 },
+  { id: 'bread', level: 1, done: (s) => (s.made.bread ?? 0) >= 1, gold: 10 },
+  { id: 'order', level: 1, done: (s) => stat(s, 'orders') >= 1, gold: 15 },
+  { id: 'field', level: 1, done: (s) => owned(s, 'field') >= 3, gold: 10 },
+  { id: 'coop', level: 1, done: (s) => owned(s, 'coop') >= 1, gold: 15 },
+  { id: 'egg', level: 1, done: (s) => (s.made.egg ?? 0) >= 1, gold: 10 },
+  { id: 'chest', level: 1, done: (s) => stat(s, 'chests') >= 1, ready: (s) => s.chests.length > 0, gold: 10 },
+  { id: 'camp', level: 2, done: (s) => s.regions.length >= 2, ready: (s) => s.play >= CAMP1_AT, gold: 20 },
+  { id: 'mine', level: 1, done: (s) => owned(s, 'mine') >= 1, gold: 15 },
+  { id: 'kitchen', level: 2, done: (s) => owned(s, 'kitchen') >= 1, gold: 15 },
+  { id: 'pie', level: 2, done: (s) => (s.made.pie ?? 0) >= 1, gold: 15 },
+  { id: 'raid', level: 1, done: (s) => stat(s, 'raids') + stat(s, 'raidsLost') >= 1, ready: (s) => s.raidAt - s.play < 45, gold: 20 },
+  { id: 'hero', level: 1, done: (s) => Object.keys(s.heroes).length >= 2, ready: (s) => !!s.visitor, gold: 20 },
+  { id: 'camp2', level: 3, done: (s) => s.regions.length >= 3, ready: (s) => Object.keys(s.heroes).length >= 2, gold: 40 },
+  { id: 'corn', level: 2, done: (s) => stat(s, 'corn') >= 1 || (s.made.corn ?? 0) >= 1, gold: 10 },
+  { id: 'forge', level: 3, done: (s) => owned(s, 'forge') >= 1, gold: 25 },
+  { id: 'sword', level: 3, done: (s) => (s.made.sword ?? 0) >= 1, gold: 25 },
+  { id: 'barracks', level: 4, done: (s) => owned(s, 'barracks') >= 1, gold: 30 },
+  { id: 'soldier', level: 4, done: (s) => (s.made.soldier ?? 0) >= 1, gold: 30 },
 ];
 
+export type GoalView = { kind: 'goal'; goal: Goal } | { kind: 'levelup'; level: number; xpLeft: number } | { kind: 'daily' };
+
+/** What the objective card shows: the first unlocked, possible goal; otherwise how to reach the next level. */
+export function currentGoal(s: GameState): GoalView {
+  const open = GOALS.filter((g) => !s.goalsDone.includes(g.id));
+  const now = open.find((g) => g.level <= s.level && (!g.ready || g.ready(s)));
+  if (now) return { kind: 'goal', goal: now };
+  const locked = open.find((g) => g.level > s.level);
+  if (locked) return { kind: 'levelup', level: s.level + 1, xpLeft: Math.max(0, xpForLevel(s.level + 1) - s.xp) };
+  return { kind: 'daily' };
+}
+
+/** What unlocks at the next level (for the level badge hint). */
+export function nextUnlocks(s: GameState): { level: number; buildings: BType[]; items: ItemId[]; xpLeft: number } {
+  const level = s.level + 1;
+  const buildings = (Object.keys(BUILDINGS) as BType[]).filter((b) => BUILDINGS[b].level === level && BUILDINGS[b].kind !== 'special' || (b === 'market' && BUILDINGS[b].level === level));
+  const items = RECIPES.filter((r) => r.level === level && r.out !== 'soldier' && r.out !== 'archer').map((r) => r.out as ItemId);
+  return { level, buildings, items: [...new Set(items)], xpLeft: Math.max(0, xpForLevel(level) - s.xp) };
+}
+
 function checkGoals(s: GameState): void {
-  while (s.tutorial < GOALS.length && GOALS[s.tutorial].done(s)) {
-    s.gold += GOALS[s.tutorial].gold;
-    addXp(s, 3);
-    emit({ type: 'goal', index: s.tutorial });
-    s.tutorial++;
+  for (const g of GOALS) {
+    if (s.goalsDone.includes(g.id) || g.level > s.level || !g.done(s)) continue;
+    s.goalsDone.push(g.id);
+    s.tutorial = s.goalsDone.length;
+    s.gold += g.gold;
+    addXp(s, 5);
+    emit({ type: 'goal', index: GOALS.indexOf(g) });
   }
+}
+
+/** Every useful thing the player could do right now (used to make sure nobody is ever stuck). */
+export function usefulActions(s: GameState, now: number): string[] {
+  const out: string[] = [];
+  const freePlot = buildMap().plots.some((p) => s.regions.includes(p.region) && !buildingOnPlot(s, p.id));
+  for (const b of s.buildings) {
+    if (b.buildEnd > 0) continue;
+    if (b.ready.length && (barnFree(s) > 0 || b.ready.some((r) => { const o = recipe(r).out; return o === 'soldier' || o === 'archer'; }))) out.push(`collect:${b.type}`);
+    const kind = BUILDINGS[b.type].kind;
+    if (kind === 'field' || kind === 'animal' || kind === 'factory') {
+      if (recipesFor(b.type).some((r) => canStart(s, b, r).ok)) out.push(`${kind === 'field' ? 'plant' : kind === 'animal' ? 'feed' : 'make'}:${b.type}`);
+    }
+  }
+  for (const o of s.orders) if (canDeliver(s, o, now)) out.push('deliver');
+  if (s.cart?.crates.some((c) => !c.done && count(s, c.item) >= c.qty)) out.push('crate');
+  if (freePlot) for (const t of Object.keys(BUILDINGS) as BType[]) if (canBuild(s, t).ok) { out.push(`build:${t}`); break; }
+  const nr = nextRegion(s);
+  if (nr !== null && canAttack(s, nr, now).ok) out.push('attack');
+  if (s.chests.length) out.push('chest');
+  if (s.visitor && s.gold >= s.visitor.gold && s.gems >= s.visitor.gems) out.push('recruit');
+  if (!s.daily.claimed && dailyPercent(s) >= 100) out.push('daily');
+  return out;
 }
 
 const CALM = new Set<GameEvent['type']>(['ready', 'barnFull']);
 const notable = (): boolean => events.some((e) => !CALM.has(e.type));
 
 /** A villager drops by with a small present (keeps the first sessions lively). */
-function gift(s: GameState): void {
-  if (roll(s) < 0.5 && s.chests.filter((c) => !c.big).length < 2) { spawnChest(s); return; }
+function gift(s: GameState, chest = false): void {
+  if ((chest || roll(s) < 0.5) && s.chests.filter((c) => !c.big).length < 2) { spawnChest(s); if (chest) return; return; }
   const pool = ITEM_IDS.filter((i) => isUnlocked(s, i) && producible(s, i) && ITEMS[i].cat !== 'tools');
   const item = rpick(s, pool);
   const qty = ITEMS[item].price < 8 ? 3 : 1;
@@ -968,6 +1026,7 @@ export function tick(s: GameState, now: number, dt: number): void {
     const prev = s.play;
     s.play += dt;
     if (prev < s.raidAt - 15 && s.play >= s.raidAt - 15) emit({ type: 'raidWarn', inSec: 15 });
+    if (prev < CAMP1_AT && s.play >= CAMP1_AT && s.regions.length === 1) emit({ type: 'campSpotted' });
     if (prev < s.raidAt && s.play >= s.raidAt) emit({ type: 'raid' });
     if (s.play >= s.nextChestAt) {
       s.nextChestAt = s.play + 70 + roll(s) * 35;
@@ -1004,6 +1063,11 @@ export function tick(s: GameState, now: number, dt: number): void {
   checkGoals(s);
   if (notable()) s.calmSince = s.play;
   else if (dt > 0 && s.play - s.calmSince > 45) { gift(s); s.calmSince = s.play; }
+  // Safety net: if the player truly has nothing useful to do for 15 s, a villager brings something.
+  if (dt > 0 && Math.floor(s.play) !== Math.floor(s.play - dt)) {
+    if (usefulActions(s, now).length) s.idleSince = s.play;
+    else if (s.play - s.idleSince > 15) { gift(s, true); s.idleSince = s.play; bump(s, 'idleGifts'); }
+  }
   s.lastSeen = now;
 }
 

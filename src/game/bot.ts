@@ -1,160 +1,227 @@
-// A sensible "first session" player used by the pacing test and to generate cover scenes.
-import { BUILDINGS, ITEMS, RECIPES, type BType, type HeroId, type ItemId } from './defs';
+// A REALISTIC first-session player: taps at human speed, waits for real timers, follows only the
+// objective card and what is visible on screen (speech bubbles, chests, order ✓). It cannot use anything locked
+// because it goes through the same rules as the UI. Used by the pacing test and to build cover scenes.
+import { BUILDINGS, RECIPES, type BType, type ItemId } from './defs';
+import { Battle } from './battle';
 import { buildMap } from './map';
 import * as G from './state';
 
 export interface TimelineEntry { t: number; text: string }
 
-const BUILD_ORDER: BType[] = ['coop', 'field', 'mine', 'forge', 'kitchen', 'field', 'barracks', 'pasture', 'market', 'field', 'dairy', 'field', 'sheep', 'weaver', 'field'];
+/** Seconds a human needs for each kind of interaction (look, tap, read the panel, tap again). */
+const COST = { bubble: 1.0, panel: 2.2, build: 3.5, deliver: 2.5, chest: 1.5, battlePrep: 3, result: 3, recruit: 3 };
 
 export class Bot {
   timeline: TimelineEntry[] = [];
   battles = 0;
+  maxIdle = 0;
+  idleRun = 0;
+  lockedGoalSeen = 0;
+  private busyUntil = 0;
   private seen = new Set<string>(['wheat', 'wood']);
+  private t = 0;
+
   constructor(public s: G.GameState, private t0: number) {}
 
-  private log(t: number, text: string): void {
-    this.timeline.push({ t, text });
+  private log(text: string): void {
+    this.timeline.push({ t: this.t, text });
   }
 
-  private now(t: number): number {
-    return this.t0 + t * 1000;
+  private get now(): number {
+    return this.t0 + this.t * 1000;
   }
 
-  /** Items the bot wants right now (orders, cart, army). */
-  private wants(now: number): Map<ItemId, number> {
-    const w = new Map<ItemId, number>();
-    const add = (i: ItemId, q: number): void => { w.set(i, (w.get(i) ?? 0) + q); };
-    for (const o of this.s.orders) if (o.readyAt <= now) for (const [i, q] of o.lines) add(i, q * 2);
-    for (const c of this.s.cart?.crates ?? []) if (!c.done) add(c.item, c.qty);
-    if (G.buildingOf(this.s, 'barracks')) { add('sword', 1); add('bread', 2); }
-    if (G.buildingOf(this.s, 'kitchen')) add('pie', 1);
-    // Plan two steps of the production chain: missing products pull in their ingredients.
-    for (let depth = 0; depth < 2; depth++) {
-      for (const [item, q] of [...w]) {
-        const deficit = q - G.count(this.s, item);
-        if (deficit <= 0) continue;
-        const r = RECIPES.find((x) => x.out === item && x.level <= this.s.level);
-        if (!r) continue;
-        for (const [inp, n] of Object.entries(r.inputs) as [ItemId, number][]) add(inp, n * Math.ceil(deficit / r.qty) * 0.5);
-      }
-    }
-    return w;
+  private busy(sec: number): void {
+    this.busyUntil = this.t + sec;
   }
 
-  step(t: number, dt: number): void {
+  run(seconds: number, dt = 0.5): void {
+    for (this.t = dt; this.t <= seconds + 1e-6; this.t += dt) this.step(dt);
+  }
+
+  step(dt: number): void {
     const s = this.s;
-    const now = this.now(t);
+    const now = this.now;
     G.tick(s, now, dt);
-    for (const e of G.drainEvents()) this.onEvent(t, e, now);
-    // Collect everything that is ready.
-    for (const b of s.buildings) {
-      if (!b.ready.length) continue;
-      const got = G.collect(s, b.id);
-      for (const k of Object.keys(got)) if (!this.seen.has(k)) { this.seen.add(k); if (k !== 'wheat') this.log(t, `First ${k} made`); }
+    for (const e of G.drainEvents()) this.onEvent(e);
+    // Once per second: is there anything useful at all? Is the objective ever locked?
+    if (Math.floor(this.t) !== Math.floor(this.t - dt)) {
+      if (G.usefulActions(s, now).length) this.idleRun = 0;
+      else { this.idleRun++; this.maxIdle = Math.max(this.maxIdle, this.idleRun); }
+      const g = G.currentGoal(s);
+      if (g.kind === 'goal' && g.goal.level > s.level) this.lockedGoalSeen++;
     }
-    // Deliver orders and crates.
-    for (const o of [...s.orders]) if (G.deliver(s, o.id, now)) this.log(t, `Order delivered (+${o.gold} gold)`);
-    s.cart?.crates.forEach((_, i) => { if (G.fillCrate(s, i)) this.log(t, 'Cart crate filled'); });
-    for (const o of s.orders) if (o.readyAt <= now && now - o.readyAt > 240_000 && !G.canDeliver(s, o, now)) G.discardOrder(s, o.id, now);
-    // Chests & visitors.
-    for (const c of [...s.chests]) { G.openChest(s, c.id); this.log(t, c.big ? 'Treasure chest opened' : 'Chest opened'); }
-    if (s.visitor && G.recruitVisitor(s, now).ok) { /* logged by event */ }
-    if (G.dailyPercent(s) >= 100 && G.claimDaily(s).ok) this.log(t, 'Daily tasks chest');
-    // Production.
-    const want = this.wants(now);
-    for (const b of s.buildings) {
-      if (b.buildEnd > 0) continue;
-      const kind = BUILDINGS[b.type].kind;
-      if (kind === 'field' && !b.jobs.length && !b.ready.length) {
-        const crops = RECIPES.filter((r) => r.building === 'field' && r.level <= s.level);
-        const pick = crops.sort((a, c) => this.need(want, a.out as ItemId) - this.need(want, c.out as ItemId) || a.time - c.time)[0];
-        if (G.start(s, b.id, pick.id, now).ok && G.stat(s, 'plants') === 0) this.log(t, `Planted ${pick.id}`);
-        s.stats.plants = G.stat(s, 'plants') + 1;
-      } else if (kind === 'animal') {
-        G.feedAll(s, b.id, now);
-      } else if (kind === 'factory') {
-        for (let k = 0; k < 2; k++) {
-          const rs = RECIPES.filter((r) => r.building === b.type && r.level <= s.level && G.canStart(s, b, r).ok);
-          if (!rs.length) break;
-          rs.sort((a, c) => this.need(want, a.out as ItemId) - this.need(want, c.out as ItemId));
-          const r = rs[0];
-          if (r.out !== 'soldier' && r.out !== 'archer' && G.count(s, r.out as ItemId) >= 6 && !want.has(r.out as ItemId)) break;
-          G.start(s, b.id, r.id, now);
-        }
+    if (this.t < this.busyUntil) return;
+    this.act(now);
+  }
+
+  /** One human action, chosen like a player would. */
+  private act(now: number): void {
+    const s = this.s;
+    // 1. Ready goods in a bubble: tap it.
+    const ready = s.buildings.find((b) => b.ready.length && b.buildEnd === 0);
+    if (ready && G.barnFree(s) > 0) {
+      const got = G.collect(s, ready.id);
+      for (const k of Object.keys(got)) if (!this.seen.has(k)) { this.seen.add(k); this.log(`First ${k} collected`); }
+      return this.busy(COST.bubble);
+    }
+    // 2. Chests and visitors are shiny: tap them.
+    if (s.chests.length) { const c = s.chests[0]; G.openChest(s, c.id); this.log(c.big ? 'Treasure chest opened' : 'Chest opened'); return this.busy(COST.chest); }
+    if (s.visitor && G.recruitVisitor(s, now).ok) return this.busy(COST.recruit);
+    // 3. Order with ✓ on the board.
+    const o = s.orders.find((x) => G.canDeliver(s, x, now));
+    if (o) { G.deliver(s, o.id, now); this.log(`Order delivered (+${o.gold} gold, +${o.xp} XP)`); return this.busy(COST.deliver); }
+    const crate = s.cart?.crates.findIndex((c) => !c.done && G.count(s, c.item) >= c.qty) ?? -1;
+    if (crate >= 0 && G.fillCrate(s, crate)) { this.log('Cart crate filled'); return this.busy(COST.deliver); }
+    if (!s.daily.claimed && G.dailyPercent(s) >= 100 && G.claimDaily(s).ok) { this.log('Daily tasks chest'); return this.busy(COST.panel); }
+    // Barn almost full: the toast says "sell or upgrade" — do that.
+    if (G.barnFree(s) <= 2) {
+      if (G.upgradeBarn(s).ok) { this.log('Barn upgraded'); return this.busy(COST.panel); }
+      const top = (Object.keys(s.items) as ItemId[]).filter((i) => !['hammer', 'nails', 'paint'].includes(i)).sort((a, b) => G.count(s, b) - G.count(s, a))[0];
+      if (top && G.sell(s, top, Math.ceil(G.count(s, top) / 2))) { this.log(`Sold surplus ${top}`); return this.busy(COST.panel); }
+    }
+    // A golden ⚔️ bubble on the map means the squad is strong enough.
+    const nr = G.nextRegion(s);
+    if (nr !== null && G.canAttack(s, nr, now).ok && G.squadPower(s, now) >= G.campPower(nr) && this.fight(nr, now)) return;
+    // 4. Follow the objective card.
+    if (this.doGoal(now)) return;
+    // 5. Obvious upkeep: replant empty fields, feed animals, keep the bakery going for orders.
+    if (this.plantAny(now)) return this.busy(COST.panel);
+    for (const b of s.buildings) if (BUILDINGS[b.type].kind === 'animal' && b.buildEnd === 0 && G.feedAll(s, b.id, now) > 0) return this.busy(COST.panel);
+    if (this.makeForOrders(now)) return this.busy(COST.panel);
+  }
+
+  private building(type: BType): G.Building | undefined {
+    return this.s.buildings.find((b) => b.type === type && b.buildEnd === 0);
+  }
+
+  private tryBuild(type: BType, now: number): boolean {
+    const s = this.s;
+    const c = G.canBuild(s, type);
+    if (!c.ok) {
+      // Read the cost on the card and go make the missing material (e.g. wood at the lumber mill).
+      if (c.reason === 'items') {
+        const { gold: _g, ...items } = G.buildCost(s, type);
+        void _g;
+        for (const [i, n] of Object.entries(items) as [ItemId, number][]) if (G.count(s, i) < n && this.produce(i, now)) { this.busy(COST.panel); return true; }
+      }
+      return false;
+    }
+    const plot = buildMap().plots.find((p) => s.regions.includes(p.region) && !G.buildingOnPlot(s, p.id));
+    if (!plot || !G.build(s, type, plot.id, now).ok) return false;
+    this.log(`Built ${type}`);
+    this.busy(COST.build);
+    return true;
+  }
+
+  private queue(type: BType, recipeId: string, now: number): boolean {
+    const b = this.building(type);
+    if (!b || !G.start(this.s, b.id, recipeId, now).ok) return false;
+    this.busy(COST.panel);
+    return true;
+  }
+
+  private plantAny(now: number, crop?: string): boolean {
+    const s = this.s;
+    const field = s.buildings.find((b) => b.type === 'field' && b.buildEnd === 0 && !b.jobs.length && !b.ready.length);
+    if (!field) return false;
+    const want = crop ?? this.cropForOrders();
+    return G.start(s, field.id, want, now).ok || G.start(s, field.id, 'wheat', now).ok;
+  }
+
+  private cropForOrders(): string {
+    const s = this.s;
+    for (const o of s.orders) for (const [i, q] of o.lines) if (['corn', 'carrot', 'cotton'].includes(i) && G.count(s, i) < q && G.isUnlocked(s, i)) return i;
+    return 'wheat';
+  }
+
+  /** Produce the first missing thing of the first order (one step of the chain), like a player reading the order. */
+  private makeForOrders(now: number): boolean {
+    const s = this.s;
+    for (const o of s.orders) {
+      if (o.readyAt > now) continue;
+      for (const [item, q] of o.lines) {
+        if (G.count(s, item) >= q) continue;
+        if (this.produce(item, now)) return true;
       }
     }
-    // Build.
-    for (const type of BUILD_ORDER) {
-      if (G.owned(s, type) >= (type === 'field' ? BUILDINGS.field.max(s.level) : 1)) continue;
-      if (!G.canBuild(s, type).ok) continue;
-      const plot = buildMap().plots.find((p) => s.regions.includes(p.region) && !G.buildingOnPlot(s, p.id));
-      if (plot && G.build(s, type, plot.id, now).ok) { this.log(t, `Built ${type}`); break; }
-    }
-    // Heroes: heal, equip, train.
-    for (const id of Object.keys(s.heroes) as HeroId[]) {
-      const h = s.heroes[id]!;
-      if (G.heroHp(h, now) < 0.5 && G.count(s, 'pie') > 0) G.feedHero(s, id, 'pie', now);
-      if (!h.weapon && G.equip(s, id, 'weapon').ok) this.log(t, `Equipped ${id}`);
-      if (G.trainHero(s, id).ok) this.log(t, `Trained ${id} to level ${h.level}`);
-    }
-    if (s.items.hammer && G.upgradeBarn(s).ok) this.log(t, 'Barn upgraded');
-    G.upgradeWalls(s);
-    // Attack the next camp when strong enough.
-    const nr = G.nextRegion(s);
-    if (nr !== null && G.canAttack(s, nr, now).ok && G.squadPower(s, now) >= G.campPower(nr) * 0.95) {
-      const battle = new G.Battle(G.campSetup(s, nr, now));
-      const win = battle.resolve() === 0;
-      this.battles++;
-      const r = G.finishCamp(s, nr, battle, now);
-      this.log(t, win ? `Battle won: camp ${nr} (${Math.round(battle.time)}s fight, +${r?.gold} gold, +${r?.gems} gems)` : `Battle lost at camp ${nr}`);
-    }
-    // Sell surplus when the barn is nearly full.
-    if (G.barnFree(s) < 6) {
-      const top = (Object.keys(s.items) as ItemId[]).filter((i) => ITEMS[i].cat !== 'tools').sort((a, b) => G.count(s, b) - G.count(s, a))[0];
-      if (top) G.sell(s, top, Math.ceil(G.count(s, top) / 2));
+    return false;
+  }
+
+  private produce(item: ItemId, now: number, depth = 0): boolean {
+    const s = this.s;
+    const r = RECIPES.find((x) => x.out === item && x.level <= s.level);
+    if (!r || depth > 2) return false;
+    const b = this.building(r.building);
+    if (!b) return false;
+    if (r.building === 'field') return this.plantAny(now, r.id);
+    if (G.canStart(s, b, r).ok) { G.start(s, b.id, r.id, now); return true; }
+    for (const [inp, n] of Object.entries(r.inputs) as [ItemId, number][]) if (G.count(s, inp) < n && this.produce(inp, now, depth + 1)) return true;
+    return false;
+  }
+
+  private doGoal(now: number): boolean {
+    const s = this.s;
+    const view = G.currentGoal(s);
+    if (view.kind !== 'goal') return false; // level-up hint: just play orders (handled by upkeep)
+    switch (view.goal.id) {
+      case 'plant': return this.plantAny(now, 'wheat') && (this.busy(COST.panel), true);
+      case 'flour': return this.queue('bakery', 'flour', now);
+      case 'bread': return this.queue('bakery', G.count(s, 'flour') ? 'bread' : 'flour', now);
+      case 'field': return this.tryBuild('field', now);
+      case 'coop': case 'mine': case 'kitchen': case 'forge': case 'barracks': return this.tryBuild(view.goal.id as BType, now);
+      case 'egg': { const c = this.building('coop'); return !!c && G.feedAll(s, c.id, now) > 0 && (this.busy(COST.panel), true); }
+      case 'pie': return this.produce('pie', now) && (this.busy(COST.panel), true);
+      case 'corn': return this.plantAny(now, 'corn') && (this.busy(COST.panel), true);
+      case 'sword': return this.produce('sword', now) && (this.busy(COST.panel), true);
+      case 'soldier': return this.produce('bread', now) || this.queue('barracks', 'soldier', now);
+      case 'camp': case 'camp2': {
+        const nr = G.nextRegion(s);
+        return nr !== null && this.fight(nr, now);
+      }
+      default: return false;
     }
   }
 
-  private need(want: Map<ItemId, number>, item: ItemId): number {
-    return G.count(this.s, item) - (want.get(item) ?? 0) * 2;
+  private fight(nr: number, now: number): boolean {
+    const s = this.s;
+    if (!G.canAttack(s, nr, now).ok) return false;
+    const battle = new Battle(G.campSetup(s, nr, now));
+    battle.resolve();
+    const r = G.finishCamp(s, nr, battle, now);
+    this.battles++;
+    this.log(r ? `Battle won: camp ${nr} (${Math.round(battle.time)}s fight, +${r.gold} gold, +${r.gems} gems)` : `Battle lost at camp ${nr} (heroes rest, try again)`);
+    this.busy(COST.battlePrep + battle.time + COST.result);
+    return true;
   }
 
-  private onEvent(t: number, e: G.GameEvent, now: number): void {
+  private onEvent(e: G.GameEvent): void {
     const s = this.s;
     switch (e.type) {
-      case 'levelUp': this.log(t, `Level up → ${e.level}`); break;
-      case 'built': if (e.btype !== 'field') this.log(t, `${e.btype} finished`); break;
-      case 'raidWarn': this.log(t, 'Raid warning: skeletons approaching'); break;
+      case 'levelUp': this.log(`LEVEL UP → ${e.level}`); break;
+      case 'built': if (e.btype !== 'field') this.log(`${e.btype} finished building`); break;
+      case 'raidWarn': this.log('Raid warning: skeletons approaching'); break;
       case 'raid': {
-        const battle = new G.Battle(G.raidSetup(s, now));
+        const battle = new Battle(G.raidSetup(s, this.now));
         battle.resolve();
-        const r = G.finishRaid(s, battle, now);
-        this.log(t, r.win ? `Raid defended (+${r.gold} gold)` : 'Raid lost (a few goods stolen)');
+        const r = G.finishRaid(s, battle, this.now);
+        this.log(r.win ? `Raid defended (+${r.gold} gold, ${Math.round(battle.time)}s)` : 'Raid lost (a few goods stolen)');
+        this.busy(battle.time + COST.result); // watching the raid
         break;
       }
-      case 'chest': this.log(t, 'Chest dropped on the map'); break;
-      case 'visitor': this.log(t, `Wandering hero arrives: ${e.hero}`); break;
-      case 'heroJoin': this.log(t, `Hero joined: ${e.hero}`); break;
-      case 'cartArrive': this.log(t, 'Cart arrived with a big order'); break;
-      case 'cartLeave': this.log(t, `Cart left (${e.complete ? 'all crates filled' : 'partly filled'})`); break;
-      case 'region': this.log(t, `New land discovered: region ${e.region}`); break;
-      case 'goal': this.log(t, `Goal done: ${G.GOALS[e.index].id}`); break;
-      case 'barnFull': break;
-      case 'order': break;
-      case 'ready': {
-        const b = s.buildings.find((x) => x.id === e.id);
-        void b;
-        break;
-      }
-      case 'market': this.log(t, 'Merchant brought new offers'); break;
-      case 'task': this.log(t, `Daily task done: ${e.kind}`); break;
-      case 'gift': this.log(t, `A villager brings a gift (+${e.gold} gold${e.item ? `, ${e.qty} ${e.item}` : ''})`); break;
+      case 'chest': this.log('Chest appeared on the map'); break;
+      case 'visitor': this.log(`Wandering hero arrives: ${e.hero}`); break;
+      case 'heroJoin': this.log(`Hero joined: ${e.hero}`); break;
+      case 'cartArrive': this.log('Trade cart arrived'); break;
+      case 'cartLeave': this.log(`Trade cart left (${e.complete ? 'all crates filled' : 'partly filled'})`); break;
+      case 'region': this.log(`New land discovered: region ${e.region}`); break;
+      case 'goal': this.log(`Goal done: ${G.GOALS[e.index].id}`); break;
+      case 'task': this.log(`Daily task done: ${e.kind}`); break;
+      case 'campSpotted': this.log('Skeleton camp spotted on the frontier!'); break;
+      case 'gift': this.log(`Villager gift (+${e.gold} gold${e.item ? `, ${e.qty} ${e.item}` : ''})`); break;
+      case 'market': if (G.buildingOf(s, 'market')) this.log('Merchant brought new offers'); break;
+      default: break;
     }
-  }
-
-  run(seconds: number, dt = 1): void {
-    for (let t = dt; t <= seconds; t += dt) this.step(t, dt);
   }
 }
 
