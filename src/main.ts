@@ -725,7 +725,7 @@ class App {
     if (params.get('title') !== '0') document.getElementById('cover-title')!.classList.remove('hidden');
     // Freeze a camp battle mid-fight for some action on the cover.
     const nr = G.nextRegion(this.state);
-    if (nr !== null && params.get('battle') !== '0') {
+    if (nr !== null && params.get('battle') === '1') {
       this.startCamp(nr, []);
       if (this.active) {
         this.ui.setHidden(true);

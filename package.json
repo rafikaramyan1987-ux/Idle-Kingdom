@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "assets": "node scripts/build-assets.mjs",
+    "assets": "node scripts/build-assets.mjs && node scripts/build-characters.mjs",
     "size": "node scripts/check-size.mjs",
     "covers": "node scripts/render-covers.mjs"
   },
