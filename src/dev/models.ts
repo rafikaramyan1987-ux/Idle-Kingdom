@@ -1,0 +1,40 @@
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+
+const params = new URLSearchParams(location.search);
+const filter = new RegExp(params.get('f') ?? '.');
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xcfe3ee);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x667755, 1.5));
+const sun = new THREE.DirectionalLight(0xffffff, 2);
+sun.position.set(5, 10, 7);
+scene.add(sun);
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+loader.load('/assets/kingdom.glb', (gltf) => {
+  const models = gltf.scene.children.filter((c) => filter.test(c.name));
+  const cols = Math.ceil(Math.sqrt(models.length * (innerWidth / innerHeight)));
+  const sp = 3;
+  models.forEach((m, i) => {
+    const x = (i % cols) * sp, z = Math.floor(i / cols) * sp;
+    m.position.set(x, 0, z);
+    scene.add(m);
+    const c = document.createElement('canvas'); c.width = 256; c.height = 48;
+    const g = c.getContext('2d')!; g.font = 'bold 22px sans-serif'; g.fillStyle = '#000'; g.fillText(m.name, 4, 30);
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c) }));
+    s.scale.set(2.6, 0.5, 1); s.position.set(x, -0.3, z + 1.3); scene.add(s);
+  });
+  const rows = Math.ceil(models.length / cols);
+  const w = cols * sp, h = rows * sp;
+  const cam = new THREE.OrthographicCamera(-w / 2, w / 2, h / 2 * 1.0, -h / 2 * 1.0, -100, 100);
+  const aspect = innerWidth / innerHeight;
+  const half = Math.max(w / aspect, h) / 2 + 1;
+  cam.left = -half * aspect; cam.right = half * aspect; cam.top = half; cam.bottom = -half;
+  cam.updateProjectionMatrix();
+  cam.position.set(w / 2 - sp / 2, 10, h / 2 - sp / 2 + 6); cam.lookAt(w / 2 - sp / 2, 0, h / 2 - sp / 2);
+  renderer.render(scene, cam);
+  (window as unknown as { done: boolean }).done = true;
+});

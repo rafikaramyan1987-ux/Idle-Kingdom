@@ -1,0 +1,13 @@
+import { chromium } from 'playwright';
+const [url, out, w = '390', h = '844', wait = '2500'] = process.argv.slice(2);
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const page = await browser.newPage({ viewport: { width: +w, height: +h }, deviceScaleFactor: 1 });
+page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log('console:', m.type(), m.text()); });
+page.on('pageerror', (e) => console.log('pageerror', e.message));
+await page.goto(url);
+await page.waitForFunction(() => window.__IK?.ready, null, { timeout: 90000 });
+await page.waitForTimeout(+wait);
+if (process.env.EVAL) console.log(await page.evaluate(process.env.EVAL));
+await page.screenshot({ path: out });
+console.log('frames', await page.evaluate(() => window.__IK.frames), 'calls', await page.evaluate(() => window.__IK.drawCalls()), 'tris', await page.evaluate(() => window.__IK.triangles()));
+await browser.close();

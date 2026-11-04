@@ -1,0 +1,41 @@
+{
+  "name": "idle-kingdom",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:crazygames": "vite build --mode crazygames && node scripts/zip-crazygames.mjs",
+    "preview": "vite preview --port 4173 --strictPort",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "assets": "node scripts/build-assets.mjs",
+    "size": "node scripts/check-size.mjs",
+    "covers": "node scripts/render-covers.mjs"
+  },
+  "dependencies": {
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@fontsource/fredoka": "5.3.0",
+    "@gltf-transform/core": "4.5.1",
+    "@gltf-transform/extensions": "4.5.1",
+    "@gltf-transform/functions": "4.5.1",
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.20.5",
+    "@types/three": "0.187.0",
+    "eslint": "10.14.0",
+    "fflate": "0.8.3",
+    "globals": "17.14.0",
+    "meshoptimizer": "1.3.0",
+    "sharp": "0.35.5",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}
