@@ -46,7 +46,11 @@ export class CameraRig {
     return width / (2 * Math.tan(Math.min(hfov, vfov) / 2));
   }
 
+  /** Optional fixed pitch in degrees (used for cover renders). */
+  pitchOverride: number | null = null;
+
   private pitch(): number {
+    if (this.pitchOverride !== null) return THREE.MathUtils.degToRad(this.pitchOverride);
     const k = (this.width - this.minWidth) / (this.maxWidth - this.minWidth);
     return THREE.MathUtils.degToRad(40 + 16 * THREE.MathUtils.clamp(k, 0, 1));
   }

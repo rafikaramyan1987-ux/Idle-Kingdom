@@ -511,7 +511,10 @@ class App {
     this.ui.setHidden(true);
     const w = window.innerWidth, h = window.innerHeight;
     const aspect = w / h;
-    this.rig.focus(-0.5, aspect > 1.2 ? 1.5 : 2.5, aspect > 1.2 ? 26 : aspect < 0.8 ? 24 : 22, true);
+    this.rig.pitchOverride = aspect > 1.2 ? 36 : 42;
+    if (aspect > 1.2) this.rig.focus(0.5, 3.5, 19, true);
+    else if (aspect < 0.8) this.rig.focus(0, 0.2, 19, true);
+    else this.rig.focus(0.3, 0.8, 22, true);
     this.rig.update(0);
     if (params.get('title') !== '0') {
       const el = document.getElementById('cover-title')!;

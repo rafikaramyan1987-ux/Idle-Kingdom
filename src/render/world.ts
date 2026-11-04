@@ -3,11 +3,11 @@ import { buildMap, hexToWorld, key, type Cell } from '../game/map';
 import type { Building, GameState } from '../game/state';
 import { CASTLE_PLOT, WALLS_PLOT } from '../game/state';
 import { ModelLibrary } from './assets';
-import { composeBuilding, constructionVisual, tierOf, type BuildingVisual } from './buildingVisuals';
+import { composeBuilding, constructionVisual, mergeStatic, tierOf, type BuildingVisual } from './buildingVisuals';
 import { Birds, RegionClouds, Smoke, Villagers, createOcean, fogTexture } from './effects';
-import { hash2 } from '../game/map';
+import { hash2, hexDist } from '../game/map';
 
-const LOCKED_COLOR = new THREE.Color(0.58, 0.64, 0.74);
+const LOCKED_COLOR = new THREE.Color(0.8, 0.86, 1.0);
 const WHITE = new THREE.Color(1, 1, 1);
 
 interface InstanceRef { mesh: THREE.InstancedMesh; index: number }
@@ -153,7 +153,11 @@ export class World {
     const big = this.lib.parts('cloud_big'), small = this.lib.parts('cloud_small');
     for (const reg of map.regions) {
       if (reg.id === 0) continue;
-      const cells = reg.cells.map((k) => { const c = map.cells.get(k)!; const w = hexToWorld(c); return { x: w.x, z: w.z, seed: hash2(c.q, c.r, 21) }; });
+      // Clouds only drift over the outer rim of locked land; inner locked tiles stay visible (tinted).
+      const cells = reg.cells
+        .map((k) => map.cells.get(k)!)
+        .filter((c) => hexDist(c) >= 6)
+        .map((c) => { const w = hexToWorld(c); return { x: w.x, z: w.z, seed: hash2(c.q, c.r, 21) }; });
       const fx = new RegionClouds(cells, big, small, this.lib.cloudMaterial, this.fogTex);
       this.scene.add(fx.group);
       this.regionFx.set(reg.id, fx);
@@ -242,6 +246,7 @@ export class World {
   }
 
   private rebuildView(v: BuildingView, b: Building, now: number): void {
+    v.root.traverse((o) => { if (o.userData.merged) (o as THREE.Mesh).geometry.dispose(); });
     v.root.clear();
     v.visual = null;
     if (b.level === 0) {
@@ -271,6 +276,7 @@ export class World {
     if (k === this.wallsKey) return;
     const grew = this.wallsKey !== '' && n > Number(this.wallsKey.split(':')[0]);
     this.wallsKey = k;
+    this.wallsGroup.traverse((o) => { if (o.userData.merged) (o as THREE.Mesh).geometry.dispose(); });
     this.wallsGroup.clear();
     map.walls.slice(0, n).forEach((w, i) => {
       const p = hexToWorld(w);
@@ -287,6 +293,8 @@ export class World {
       }
       if (grew && i === n - 1 && !this.reducedMotion) this.smoke.burst(new THREE.Vector3(p.x, 0.3, p.z), 10);
     });
+    this.wallsGroup.updateMatrixWorld(true);
+    mergeStatic(this.wallsGroup, [], this.lib.material);
     this.wallsGroup.traverse((o) => { o.userData.walls = true; });
     this.shadowDirty = true;
   }
@@ -324,7 +332,7 @@ export class World {
   labelAnchor(id: number): THREE.Vector3 | null {
     const v = this.views.get(id);
     if (!v) return null;
-    const h = v.visual ? v.visual.height * (v.visual.group.children[0]?.scale.x ?? 1) : 1.0;
+    const h = v.visual ? v.visual.height : 1.0;
     return v.pos.clone().setY(Math.max(0.9, h + 0.25));
   }
 
@@ -380,11 +388,7 @@ export class World {
         v.smokeTimer -= dt;
         if (v.smokeTimer <= 0) {
           v.smokeTimer = 0.7 + Math.random() * 0.5;
-          for (const sp of v.visual.smoke) {
-            const p = sp.clone();
-            v.visual.group.children[0].localToWorld(p);
-            this.smoke.emit(p);
-          }
+          for (const sp of v.visual.smoke) this.smoke.emit(v.root.localToWorld(sp.clone()));
         }
       }
     }

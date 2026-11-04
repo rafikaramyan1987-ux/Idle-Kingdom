@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { BuildingType } from '../game/economy';
 import type { ModelLibrary } from './assets';
 
@@ -125,9 +126,56 @@ export function composeBuilding(lib: ModelLibrary, type: BuildingType, level: nu
     group.add(o);
   }
   collectSpinners(group, spinners);
-  for (const [x, y, z] of recipe.smoke ?? []) smoke.push(new THREE.Vector3(x, y, z));
+  group.updateMatrixWorld(true);
+  // Smoke emitters and height in building space (computed before merging).
+  for (const [x, y, z] of recipe.smoke ?? []) smoke.push(main.localToWorld(new THREE.Vector3(x, y, z)));
   const box = new THREE.Box3().setFromObject(main);
+  mergeStatic(group, spinners.map((s) => s.obj), lib.material);
   return { group, spinners, smoke, height: box.max.y };
+}
+
+function floatAttr(a: THREE.BufferAttribute | THREE.InterleavedBufferAttribute, size: number): THREE.BufferAttribute {
+  const out = new Float32Array(a.count * size);
+  for (let i = 0; i < a.count; i++) {
+    out[i * size] = a.getX(i);
+    if (size > 1) out[i * size + 1] = a.getY(i);
+    if (size > 2) out[i * size + 2] = a.getZ(i);
+  }
+  return new THREE.BufferAttribute(out, size);
+}
+
+/** Merges all static meshes sharing the atlas material into one draw call (spinners and flags stay separate). */
+export function mergeStatic(group: THREE.Object3D, keep: THREE.Object3D[], material: THREE.Material): void {
+  const meshes: THREE.Mesh[] = [];
+  const isKept = (o: THREE.Object3D): boolean => {
+    for (let p: THREE.Object3D | null = o; p; p = p.parent) if (keep.includes(p)) return true;
+    return false;
+  };
+  group.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (m.isMesh && m.material === material && !isKept(m)) meshes.push(m);
+  });
+  if (meshes.length < 2) return;
+  const inv = new THREE.Matrix4().copy(group.matrixWorld).invert();
+  const geos = meshes.map((m) => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', floatAttr(m.geometry.getAttribute('position'), 3));
+    g.setAttribute('normal', floatAttr(m.geometry.getAttribute('normal'), 3));
+    g.setAttribute('uv', floatAttr(m.geometry.getAttribute('uv'), 2));
+    if (m.geometry.index) g.setIndex(Array.from(m.geometry.index.array));
+    g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld));
+    return g;
+  });
+  const allIndexed = geos.every((g) => g.index);
+  const merged = mergeGeometries(allIndexed ? geos : geos.map((g) => (g.index ? g.toNonIndexed() : g)), false);
+  geos.forEach((g) => g.dispose());
+  if (!merged) return;
+  for (const m of meshes) m.parent?.remove(m);
+  const mesh = new THREE.Mesh(merged, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.merged = true;
+  group.add(mesh);
 }
 
 export function constructionVisual(lib: ModelLibrary, progress: number): THREE.Object3D {

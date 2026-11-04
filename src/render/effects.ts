@@ -241,10 +241,10 @@ export class Villagers {
       this.adj.get(a)!.push(b);
       this.adj.get(b)!.push(a);
     }
-    const body = new THREE.CapsuleGeometry(0.05, 0.08, 2, 6);
-    body.translate(0, 0.1, 0);
-    const head = new THREE.SphereGeometry(0.045, 8, 6);
-    head.translate(0, 0.22, 0);
+    const body = new THREE.CapsuleGeometry(0.07, 0.11, 2, 6);
+    body.translate(0, 0.14, 0);
+    const head = new THREE.SphereGeometry(0.06, 8, 6);
+    head.translate(0, 0.3, 0);
     const shadow = new THREE.CircleGeometry(0.08, 10);
     shadow.rotateX(-Math.PI / 2);
     shadow.translate(0, 0.012, 0);
@@ -349,7 +349,7 @@ export class RegionClouds {
 
   constructor(cells: { x: number; z: number; seed: number }[], big: { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[], small: { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[], base: THREE.MeshLambertMaterial, fogTex: THREE.Texture) {
     this.material = base.clone();
-    const chosen = cells.filter((c) => c.seed < 0.45);
+    const chosen = cells.filter((c) => c.seed < 0.5);
     const bigCells = chosen.filter((_, i) => i % 2 === 0), smallCells = chosen.filter((_, i) => i % 2 === 1);
     const addSet = (parts: typeof big, list: typeof cells, scale: number): void => {
       const meshIdx = this.meshes.length;

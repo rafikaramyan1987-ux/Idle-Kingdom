@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests (economy, save, map)
+        run: npm test
+      - name: Build (GitHub Pages)
+        run: npm run build
+      - name: Size check (≤ 20 MB)
+        run: npm run size -- dist
+      - name: Build CrazyGames zip
+        run: npm run build:crazygames && node scripts/check-size.mjs dist-crazygames
+      - uses: actions/upload-artifact@v4
+        with:
+          name: idle-kingdom-crazygames
+          path: idle-kingdom-crazygames.zip
+          if-no-files-found: error
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Playwright smoke test (390px)
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results

@@ -102,6 +102,16 @@ export class ModelLibrary {
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nuniform float uTime;')
         .replace(
+          '#include <color_fragment>',
+          `#include <color_fragment>
+          #if defined( USE_COLOR ) || defined( USE_COLOR_ALPHA )
+          // Locked land is marked with a bluish instance colour: turn it into a soft, misty, desaturated look.
+          float lockedAmt = clamp((vColor.b - vColor.r) * 5.0, 0.0, 1.0);
+          float lum = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+          diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(lum), vec3(0.42, 0.52, 0.62), 0.35), lockedAmt * 0.55);
+          #endif`,
+        )
+        .replace(
           '#include <map_fragment>',
           `#include <map_fragment>
           // Fresher, lusher greens: the atlas grass is quite yellow (values are linear here).

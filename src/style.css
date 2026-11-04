@@ -249,7 +249,7 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 
 #cover-title { position: fixed; z-index: 4; left: 0; right: 0; top: 5%; display: flex; justify-content: center; pointer-events: none; }
 #cover-title span { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: min(11vw, 13vh); color: #fff; letter-spacing: 1px;
-  text-shadow: 0 0.06em 0 #2f6db0, 0 0.1em 0 #24578f, 0 0.16em 0.3em rgba(20, 50, 90, 0.45); -webkit-text-stroke: 0.02em #2f6db0; }
+  text-shadow: 0 0.06em 0 #2f6db0, 0 0.1em 0 #24578f, 0 0.16em 0.3em rgba(20, 50, 90, 0.45); }
 
 @media (max-width: 370px) {
   .res { font-size: 13px; padding: 4px 6px 4px 4px; gap: 3px; }
