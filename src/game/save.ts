@@ -1,7 +1,6 @@
-import { RESOURCES } from './economy';
 import { newGame, SAVE_VERSION, type GameState } from './state';
 
-export const SAVE_KEY = 'idle-kingdom-save-v1';
+export const SAVE_KEY = 'idle-kingdom-save-v2';
 
 export interface KeyValueStore {
   getItem(key: string): string | null;
@@ -15,7 +14,7 @@ export function serialize(s: GameState): string {
 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
-/** Parses and sanitises a save. Returns null when the data is unusable. */
+/** Parses and sanitises a save. Returns null when the data is unusable (the game then starts fresh). */
 export function deserialize(raw: string | null, now: number): GameState | null {
   if (!raw) return null;
   let data: Partial<GameState>;
@@ -24,29 +23,25 @@ export function deserialize(raw: string | null, now: number): GameState | null {
   } catch {
     return null;
   }
-  if (!data || typeof data !== 'object' || !isNum(data.version) || data.version > SAVE_VERSION) return null;
-  if (!Array.isArray(data.buildings) || !data.res) return null;
+  if (!data || typeof data !== 'object' || data.version !== SAVE_VERSION) return null;
+  if (!Array.isArray(data.buildings) || typeof data.items !== 'object' || !data.items) return null;
   const base = newGame(now);
-  const s: GameState = { ...base, ...data, settings: { ...base.settings, ...data.settings }, stats: { ...base.stats, ...data.stats } } as GameState;
-  for (const r of RESOURCES) {
-    s.res[r] = isNum(s.res[r]) ? Math.max(0, s.res[r]) : 0;
-    s.earned = s.earned ?? { ...base.earned };
-    s.earned[r] = isNum(s.earned[r]) ? s.earned[r] : 0;
-    s.collected = s.collected ?? { ...base.collected };
-    s.collected[r] = isNum(s.collected[r]) ? s.collected[r] : 0;
-  }
-  s.buildings = s.buildings.filter((b) => b && isNum(b.level) && typeof b.type === 'string');
+  const s = { ...base, ...data } as GameState;
+  s.settings = { ...base.settings, ...data.settings };
+  s.research = { ...base.research, ...data.research };
+  s.troops = { ...base.troops, ...data.troops };
+  for (const k of ['gold', 'gems', 'xp', 'play', 'taxAcc'] as const) s[k] = isNum(s[k]) ? Math.max(0, s[k]) : 0;
+  if (!isNum(s.level) || s.level < 1) s.level = 1;
+  for (const [k, v] of Object.entries(s.items)) if (!isNum(v) || v < 0) (s.items as Record<string, number>)[k] = 0;
+  s.buildings = s.buildings.filter((b) => b && typeof b.type === 'string' && isNum(b.plot));
   for (const b of s.buildings) {
-    b.pending = Object.assign({ food: 0, wood: 0, stone: 0, gold: 0 }, b.pending);
-    b.upgradeEnd = isNum(b.upgradeEnd) ? b.upgradeEnd : 0;
-    b.upgradeStart = isNum(b.upgradeStart) ? b.upgradeStart : 0;
+    b.jobs = Array.isArray(b.jobs) ? b.jobs.filter((j) => j && isNum(j.end)) : [];
+    b.ready = Array.isArray(b.ready) ? b.ready : [];
+    b.buildEnd = isNum(b.buildEnd) ? b.buildEnd : 0;
   }
   if (!s.buildings.some((b) => b.type === 'castle')) return null;
-  if (!s.buildings.some((b) => b.type === 'walls')) s.buildings.push({ ...base.buildings[1], id: s.nextId++ });
-  if (!Array.isArray(s.regions) || !s.regions.includes(0)) s.regions = [0, ...(s.regions ?? [])];
+  if (!Array.isArray(s.regions) || !s.regions.includes(0)) s.regions = [0];
   if (!isNum(s.lastSeen) || s.lastSeen > now) s.lastSeen = now;
-  s.newHeroes = Array.isArray(s.newHeroes) ? s.newHeroes : [];
-  s.version = SAVE_VERSION;
   return s;
 }
 

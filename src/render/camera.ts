@@ -73,6 +73,12 @@ export class CameraRig {
 
   get zoomWidth(): number { return this.width; }
 
+  private shakeAmt = 0;
+  /** Small screen shake for hits and skills. */
+  shake(k: number): void {
+    this.shakeAmt = Math.min(0.35, this.shakeAmt + k);
+  }
+
   update(dt: number): boolean {
     const before = this.camera.position.clone();
     if (this.pointers.size === 0 && this.vel.lengthSq() > 1e-6) {
@@ -88,6 +94,11 @@ export class CameraRig {
     const p = this.pitch();
     this.camera.position.set(this.target.x, Math.sin(p) * d, this.target.y + Math.cos(p) * d);
     this.camera.lookAt(this.target.x, 0, this.target.y);
+    if (this.shakeAmt > 0.001) {
+      this.camera.position.x += (Math.random() - 0.5) * this.shakeAmt;
+      this.camera.position.y += (Math.random() - 0.5) * this.shakeAmt;
+      this.shakeAmt *= Math.pow(0.002, dt);
+    }
     const moved = before.distanceToSquared(this.camera.position) > 1e-8;
     if (moved) this.onMove();
     return moved;

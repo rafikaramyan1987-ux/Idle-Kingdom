@@ -1,40 +1,38 @@
 # Idle Kingdom (working title)
 
-A relaxing idle kingdom builder in cozy stylized 3D (Three.js). Single-player, no server, mobile-first portrait.
+A cozy 3D kingdom builder (Three.js) with a Township-style production economy and light, readable auto-battles.
+Single-player, no server, mobile-first portrait.
 
-- Hex island with a river, walls, forests and mountains; locked land is misty with clouds drifting over the edges.
-- Farms, lumber mills, mines, houses, markets, a forge, walls and the castle. Buildings visibly grow with level.
-- Resources accumulate while you play and while the game is closed (up to 8 h, with a "welcome back" screen).
-- Heroes unlocked by milestones (no gacha), a quest card with the next small goal, and "New era" prestige.
-- EN / FR, soft synthesized sounds, mute, `prefers-reduced-motion`, adaptive quality, autosave to localStorage.
-- CrazyGames HTML5 SDK v3 adapter (rewarded: x2 offline, x2 production 5 min, finish upgrade; paced midgame ads).
-  Without the SDK (GitHub Pages, local) the game runs normally with no ads.
+- **Production chains**: fields (wheat, corn, carrots, cotton), animals (chickens → eggs, cows → milk, sheep → wool),
+  lumber mill, mine, and factories with queues: bakery, dairy, forge, weaver, kitchen, barracks.
+- **Barn** with limited space and category tabs; bigger barn needs hammers, nails and paint from battles, chests and orders.
+- **Orders**: villager order board, a trade cart with big crate orders (bonus chest), army orders in the barracks.
+- **Heroes & battles**: KayKit adventurers vs skeletons, animated auto-battles with skills on cooldown, damage numbers,
+  screen shake. Defeat camps to discover land, treasure and ruins. Heroes level up, get stars, equipment and meals.
+- **Events**: skeleton raids on the walls every few minutes (losing only costs a few goods), chests, wandering heroes,
+  villager gifts, daily tasks, weekly festival leaderboard with AI rivals.
+- **Market & shop**: rotating merchant offers, selling surplus, queue slots, boosts, gear, decorations, castle skins,
+  research. Gems come from battles, tasks and rewarded ads — no real-money purchases.
+- EN / FR (auto-detected), soft synthesized sounds, mute, `prefers-reduced-motion`, adaptive quality, safe areas,
+  autosave to localStorage. CrazyGames SDK v3 adapter; works normally without it.
 
 ## Develop
 
 ```bash
 npm ci
 npm run dev            # http://localhost:5173
-npm run lint && npm run typecheck && npm test
-npm run build && npm run test:e2e   # Playwright smoke test at 390px (software WebGL)
-npm run build:crazygames            # -> idle-kingdom-crazygames.zip
-npm run build && npm run covers     # -> covers/*.png rendered from the real scene
+npm run lint && npm run typecheck && npm test   # TIMELINE=1 npm test prints the 15-minute session timeline
+npm run build && npm run test:e2e               # Playwright at 390px (software WebGL)
+npm run build:crazygames                        # -> idle-kingdom-crazygames.zip
+npm run build && npm run covers                 # -> covers/*.png rendered from the real scene
 ```
 
-Assets: `node scripts/fetch-assets.mjs && node scripts/build-assets.mjs` regenerates `public/assets/kingdom.glb`
-from the CC0 KayKit pack (see [CREDITS.md](CREDITS.md)).
-
-Useful URL flags: `?cover=1` (cover render mode), `?e2e=1` (fresh game, test hooks), `?cg=1` (load the CrazyGames SDK).
-
-## Deploy
-
-- **GitHub Pages**: `.github/workflows/deploy.yml` deploys only from `main`
-  (Settings → Pages → Source: GitHub Actions).
-- **CrazyGames**: CI uploads `idle-kingdom-crazygames.zip` as a build artifact on every run.
+Assets: `node scripts/fetch-assets.mjs && npm run assets` (CC0 KayKit packs, see [CREDITS.md](CREDITS.md)).
+URL flags: `?cover=1` (cover mode), `?e2e=1` (fresh game, test hooks), `?cg=1` (load the CrazyGames SDK).
 
 ## Structure
 
-- `src/game/` pure, unit-tested logic: economy, state & actions, quests, heroes, map layout, save, ad pacing.
-- `src/render/` Three.js scene: instanced terrain, building visuals, ocean/smoke/birds/villagers/clouds, camera, adaptive quality.
-- `src/ui/` HTML overlay (resource bar, labels, quest card, bottom nav, bottom sheets).
-- `src/platform/sdk.ts` CrazyGames SDK adapter. `src/audio/` Web Audio synth.
+- `src/game/` pure, unit-tested logic: `defs.ts` (items, recipes, buildings, heroes), `state.ts` (all actions, events,
+  timers), `battle.ts` (deterministic auto-battle), `bot.ts` (first-session player for pacing tests and covers), map, save.
+- `src/render/` Three.js: instanced island, building visuals, farm life, characters, battle view, effects, camera.
+- `src/ui/` HTML overlay (HUD, bubbles, panels, battle HUD). `src/platform/` CrazyGames adapter. `src/audio/` synth.

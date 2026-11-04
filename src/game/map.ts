@@ -90,7 +90,7 @@ function pickWall(edges: number[], gate: boolean): { model: string; rot: number 
   return { model: gate ? 'wall_straight_gate' : 'wall_straight', rot: 0 };
 }
 
-export type CellKind = 'grass' | 'river' | 'road' | 'castle' | 'plot' | 'decor';
+export type CellKind = 'grass' | 'river' | 'road' | 'castle' | 'plot' | 'decor' | 'camp' | 'ruins' | 'courtyard';
 
 export interface Decor { model: string; rot: number; scale: number; dx: number; dz: number }
 
@@ -118,12 +118,16 @@ export interface KingdomMap {
   /** Road graph for villagers: adjacency between road cells (+castle). */
   roadLinks: [string, string][];
   watermill: { q: number; r: number; edge: number };
+  /** Enemy camp guarding each region (index = region id, 0 unused). */
+  camps: ({ q: number; r: number } | null)[];
+  /** Ancient ruins to restore (some regions). */
+  ruins: { region: number; q: number; r: number }[];
   /** Wall tiles in build order (gates first). */
   walls: { q: number; r: number; model: string; rot: number; gate: boolean }[];
   radius: number;
 }
 
-const SECTOR_ORDER = [4, 5, 3, 0, 2, 1]; // unlock order: SW, SE, W, E, NW, NE (front first)
+const SECTOR_ORDER = [3, 5, 4, 0, 2, 1]; // unlock order: W, SE, SW, E, NW, NE
 
 function sectorOf(h: Axial): number {
   const { x, z } = hexToWorld(h);
@@ -153,9 +157,12 @@ export const WALL_RING = 2;
 const WALL_ORDER: Axial[] = [
   { q: -2, r: 2 }, { q: 0, r: -2 }, { q: -1, r: 2 }, { q: -2, r: 1 }, { q: 1, r: -2 }, { q: -1, r: -1 }, { q: 0, r: 2 }, { q: -2, r: 0 }, { q: 2, r: -2 },
 ];
+/** Building plots of the starting land (ring 3, outside the walls). Ring 1 is the castle courtyard. */
 const REGION0_PLOTS: Axial[] = [
-  { q: 0, r: 1 }, { q: -1, r: 0 }, { q: 1, r: 0 }, { q: -2, r: 3 }, { q: -3, r: 1 }, { q: 0, r: 3 }, { q: -2, r: -1 }, { q: 2, r: 1 },
+  { q: 0, r: 3 }, { q: -2, r: 3 }, { q: -3, r: 2 }, { q: -3, r: 1 }, { q: -3, r: 0 }, { q: -2, r: -1 }, { q: -1, r: -2 },
+  { q: 1, r: -3 }, { q: 2, r: -3 }, { q: 3, r: -3 }, { q: 3, r: -1 }, { q: 3, r: 0 }, { q: 2, r: 1 },
 ];
+export const COURTYARD: Axial[] = [{ q: 0, r: 1 }, { q: -1, r: 0 }, { q: 1, r: 0 }];
 
 let cached: KingdomMap | null = null;
 
@@ -258,6 +265,17 @@ export function buildMap(): KingdomMap {
     const c = cells.get(key(h))!;
     if (!gate) c.kind = 'decor';
   }
+  // Camps sit on the inner edge of each region (closest to the kingdom); a camp may block a road.
+  const camps: KingdomMap['camps'] = [null];
+  const ruins: KingdomMap['ruins'] = [];
+  for (const reg of regions) {
+    if (reg.id === 0) continue;
+    const cs = reg.cells.map((k) => cells.get(k)!).filter((c) => !reserved.has(key(c)));
+    const byDist = (a: Cell, b: Cell): number => hexDist(a) - hexDist(b) || hash2(a.q, a.r, 13) - hash2(b.q, b.r, 13);
+    const grass = cs.filter((c) => c.kind === 'grass');
+    const camp = (grass.length <= 6 ? cs.filter((c) => c.kind === 'road').sort(byDist)[0] : undefined) ?? grass.sort(byDist)[0] ?? cs.filter((c) => c.kind === 'road').sort(byDist)[0];
+    if (camp) { if (camp.kind === 'grass') camp.kind = 'camp' as CellKind; camps[reg.id] = { q: camp.q, r: camp.r }; }
+  }
   for (const h of REGION0_PLOTS) addPlot(cells.get(key(h))!);
   for (const reg of regions) {
     if (reg.id === 0) continue;
@@ -266,15 +284,22 @@ export function buildMap(): KingdomMap {
       .filter((c) => c.kind === 'grass' && hexDist(c) <= 7 && !reserved.has(key(c)))
       .sort((a, b) => hexDist(a) - hexDist(b) || hash2(a.q, a.r, 5) - hash2(b.q, b.r, 5));
     // Prefer cells next to roads/rivers, then spread.
-    const want = reg.id <= 6 ? 4 : 4;
+    const want = reg.id <= 6 ? 3 : 5;
     const picked: Cell[] = [];
     for (const c of free) {
       if (picked.length >= want) break;
-      if (picked.some((p) => hexDist(p, c) < 2) && free.length - picked.length > want) continue;
+      if (picked.some((p) => hexDist(p, c) < 2) && free.length - picked.length > want + 4) continue;
       picked.push(c);
     }
     for (const c of picked.sort((a, b) => hexDist(a) - hexDist(b))) addPlot(c);
   }
+
+  for (const reg of regions) {
+    if (reg.id === 0 || reg.id % 2 !== 0) continue;
+    const ru = reg.cells.map((k) => cells.get(k)!).filter((c) => c.kind === 'grass' && !reserved.has(key(c))).sort((a, b) => hexDist(b) - hexDist(a))[0];
+    if (ru) { ru.kind = 'ruins' as CellKind; ruins.push({ region: reg.id, q: ru.q, r: ru.r }); }
+  }
+  for (const h of COURTYARD) { const c = cells.get(key(h)); if (c) c.kind = 'courtyard' as CellKind; }
 
   // Decoration for the remaining grass cells.
   const wm = cells.get(key(watermill))!;
@@ -310,6 +335,6 @@ export function buildMap(): KingdomMap {
     if (c && (c.kind === 'decor' || c.kind === 'grass')) { c.kind = 'decor'; c.decor = ds; }
   }
 
-  cached = { cells, regions, plots, river, roads, roadLinks: uniqLinks, watermill, walls, radius: R };
+  cached = { cells, regions, plots, river, roads, roadLinks: uniqLinks, watermill, walls, camps, ruins, radius: R };
   return cached;
 }
