@@ -9,5 +9,5 @@ await page.waitForFunction(() => window.__IK?.ready, null, { timeout: 90000 });
 await page.waitForTimeout(+wait);
 if (process.env.EVAL) { console.log(await page.evaluate(process.env.EVAL)); await page.waitForTimeout(1500); }
 await page.screenshot({ path: out });
-console.log('frames', await page.evaluate(() => window.__IK.frames), 'calls', await page.evaluate(() => window.__IK.drawCalls()), 'tris', await page.evaluate(() => window.__IK.triangles()));
+console.log('frames', await page.evaluate(() => window.__IK.frames), 'calls', await page.evaluate(() => window.__IK.drawCalls()));
 await browser.close();

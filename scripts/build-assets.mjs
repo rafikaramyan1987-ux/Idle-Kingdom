@@ -22,7 +22,7 @@ const dirs = [
   'tiles/base', 'tiles/rivers', 'tiles/roads', 'tiles/coast',
   'buildings/red', 'buildings/neutral', 'decoration/nature', 'decoration/props',
 ];
-const skip = /projectile|building_destroyed|_blue|_green|_yellow|bucket_arrows|target|weaponrack_|catapult/;
+const skip = /projectile|_blue|_green|_yellow|bucket_arrows|target|weaponrack_|catapult/;
 const files = [];
 for (const d of dirs) {
   for (const f of fs.readdirSync(path.join(GLTF, d))) {
@@ -31,6 +31,9 @@ for (const d of dirs) {
   }
 }
 files.push(path.join(GLTF, 'decoration/props/weaponrack.gltf'));
+// Castle colour skins for the shop (keep their colour suffix).
+for (const c of ['blue', 'green', 'yellow']) files.push(path.join(GLTF, `buildings/${c}/building_castle_${c}.gltf`));
+for (const c of ['blue', 'yellow']) files.push(path.join(GLTF, `decoration/props/flag_${c}.gltf`));
 
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
 const out = new Document();
@@ -39,7 +42,7 @@ const outScene = out.createScene('kingdom');
 const seen = new Set();
 
 for (const file of files) {
-  const key = path.basename(file, '.gltf').replace(/_red$/, '');
+  const key = /castle_(blue|green|yellow)|flag_(blue|yellow)/.test(file) ? path.basename(file, '.gltf') : path.basename(file, '.gltf').replace(/_red$/, '');
   if (seen.has(key)) continue;
   seen.add(key);
   const doc = await io.read(file);
