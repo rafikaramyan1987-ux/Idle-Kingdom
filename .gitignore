@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-*
+*.zip
+test-results
+playwright-report
+.vite
+assets-src/*
+!assets-src/README.md
