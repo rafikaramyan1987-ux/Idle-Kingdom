@@ -650,7 +650,11 @@ export class UI {
       const pt = this.a.project(w.kind, w.id);
       if (!pt || !pt.visible) { l.el.style.visibility = 'hidden'; continue; }
       l.el.style.visibility = '';
-      l.el.style.transform = `translate3d(${pt.x.toFixed(1)}px, ${pt.y.toFixed(1)}px, 0) translate(-50%, -100%)`;
+      // Keep labels fully on screen (half label width ≈ 70px for the widest ones).
+      const half = w.kind === 'region' ? 80 : 34;
+      const x = Math.min(window.innerWidth - half, Math.max(half, pt.x));
+      const tr = `translate3d(${x.toFixed(1)}px, ${pt.y.toFixed(1)}px, 0) translate(-50%, -100%)`;
+      if (l.el.style.transform !== tr) l.el.style.transform = tr;
     }
   }
 

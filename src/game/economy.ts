@@ -26,14 +26,14 @@ export interface BuildingDef {
 }
 
 export const BUILDINGS: Record<BuildingType, BuildingDef> = {
-  castle: { type: 'castle', produces: { gold: 0.5 }, baseCost: { gold: 80, wood: 60, stone: 40 }, costGrowth: 2.1, unlockCastle: 0, maxCount: 1, levelsPerCastle: 0, timeFactor: 2 },
-  walls: { type: 'walls', produces: {}, globalBonus: 0.03, baseCost: { stone: 60, wood: 50 }, costGrowth: 1.6, unlockCastle: 2, maxCount: 1, levelsPerCastle: 3, timeFactor: 1.5 },
-  farm: { type: 'farm', produces: { food: 1 }, baseCost: { wood: 12, gold: 8 }, costGrowth: 1.45, unlockCastle: 1, maxCount: 99, levelsPerCastle: 5, timeFactor: 1 },
-  lumber: { type: 'lumber', produces: { wood: 0.8 }, baseCost: { food: 15, gold: 8 }, costGrowth: 1.45, unlockCastle: 1, maxCount: 99, levelsPerCastle: 5, timeFactor: 1 },
-  house: { type: 'house', produces: { gold: 0.2 }, population: 4, baseCost: { wood: 20, food: 20 }, costGrowth: 1.5, unlockCastle: 1, maxCount: 99, levelsPerCastle: 5, timeFactor: 1 },
-  mine: { type: 'mine', produces: { stone: 0.5, gold: 0.15 }, baseCost: { wood: 40, food: 40 }, costGrowth: 1.5, unlockCastle: 2, maxCount: 99, levelsPerCastle: 5, timeFactor: 1.2 },
-  market: { type: 'market', produces: { gold: 1.2 }, baseCost: { wood: 80, stone: 40 }, costGrowth: 1.55, unlockCastle: 2, maxCount: 2, levelsPerCastle: 5, timeFactor: 1.3 },
-  forge: { type: 'forge', produces: {}, globalBonus: 0.05, baseCost: { wood: 150, stone: 120, gold: 60 }, costGrowth: 1.65, unlockCastle: 3, maxCount: 1, levelsPerCastle: 5, timeFactor: 1.5 },
+  castle: { type: 'castle', produces: { gold: 0.4 }, baseCost: { gold: 100, wood: 80, stone: 60 }, costGrowth: 6, unlockCastle: 0, maxCount: 1, levelsPerCastle: 0, timeFactor: 2 },
+  walls: { type: 'walls', produces: {}, globalBonus: 0.02, baseCost: { stone: 100, wood: 80 }, costGrowth: 1.7, unlockCastle: 2, maxCount: 1, levelsPerCastle: 3, timeFactor: 1.5 },
+  farm: { type: 'farm', produces: { food: 0.6 }, baseCost: { wood: 20, gold: 12 }, costGrowth: 1.62, unlockCastle: 1, maxCount: 99, levelsPerCastle: 5, timeFactor: 1 },
+  lumber: { type: 'lumber', produces: { wood: 0.5 }, baseCost: { food: 25, gold: 12 }, costGrowth: 1.62, unlockCastle: 1, maxCount: 99, levelsPerCastle: 5, timeFactor: 1 },
+  house: { type: 'house', produces: { gold: 0.1 }, population: 2, baseCost: { wood: 30, food: 30 }, costGrowth: 1.66, unlockCastle: 1, maxCount: 99, levelsPerCastle: 5, timeFactor: 1 },
+  mine: { type: 'mine', produces: { stone: 0.35, gold: 0.08 }, baseCost: { wood: 60, food: 60 }, costGrowth: 1.66, unlockCastle: 2, maxCount: 99, levelsPerCastle: 5, timeFactor: 1.2 },
+  market: { type: 'market', produces: { gold: 0.5 }, baseCost: { wood: 120, stone: 60 }, costGrowth: 1.7, unlockCastle: 2, maxCount: 2, levelsPerCastle: 5, timeFactor: 1.3 },
+  forge: { type: 'forge', produces: {}, globalBonus: 0.04, baseCost: { wood: 300, stone: 240, gold: 150 }, costGrowth: 1.8, unlockCastle: 3, maxCount: 1, levelsPerCastle: 5, timeFactor: 1.5 },
 };
 
 export const START_RESOURCES: Record<Res, number> = { food: 30, wood: 40, stone: 0, gold: 30 };
@@ -43,14 +43,14 @@ export const OFFLINE_MIN_SECONDS = 60;
 export const STORAGE_SECONDS = 30 * 60;
 export const BOOST_SECONDS = 5 * 60;
 export const BASE_BUILDERS = 2;
-export const POP_BONUS = 0.01;
+export const POP_BONUS = 0.002;
 export const STAR_BONUS = 0.1;
 export const ERA_CASTLE_LEVEL = 8;
 
 /** Production multiplier for a building level: grows a bit faster than linear. */
 export function levelMultiplier(level: number): number {
   if (level <= 0) return 0;
-  return level * Math.pow(1.12, level - 1);
+  return level * Math.pow(1.07, level - 1);
 }
 
 export function scaleBundle(b: Bundle, k: number): Bundle {
@@ -110,7 +110,7 @@ export const REGION_COUNT = 13; // region 0 is the starting land
 export function regionCost(region: number): Bundle {
   if (region <= 0) return {};
   const n = region - 1;
-  return { gold: niceRound(60 * Math.pow(3.1, n)), wood: niceRound(50 * Math.pow(2.9, n)), ...(n >= 2 ? { stone: niceRound(40 * Math.pow(2.9, n - 2)) } : {}) };
+  return { gold: niceRound(80 * Math.pow(3.9, n)), wood: niceRound(70 * Math.pow(3.7, n)), ...(n >= 2 ? { stone: niceRound(60 * Math.pow(3.7, n - 2)) } : {}) };
 }
 
 export function regionCastleReq(region: number): number {
@@ -119,6 +119,6 @@ export function regionCastleReq(region: number): number {
 
 // ---------- Era (prestige) ----------
 export function starsForLifetimeGold(lifetimeGold: number): number {
-  if (lifetimeGold < 2e4) return 0;
-  return Math.floor(4 * Math.sqrt(lifetimeGold / 2e4));
+  if (lifetimeGold < 1e5) return 0;
+  return Math.floor(Math.sqrt(lifetimeGold / 1e5));
 }
